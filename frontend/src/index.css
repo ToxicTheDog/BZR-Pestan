@@ -1,0 +1,132 @@
+/* Fontovi idu u build — portal radi i bez interneta na serveru. */
+@import '@fontsource/inter-tight/400.css';
+@import '@fontsource/inter-tight/500.css';
+@import '@fontsource/inter-tight/600.css';
+@import '@fontsource/inter-tight/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-safety-400 ring-offset-2 ring-offset-paper;
+  }
+
+  ::selection {
+    @apply bg-safety-100 text-ink;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+}
+
+@layer components {
+  /* Brojevi u tabelama moraju da se poravnaju po koloni. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  .eyebrow {
+    @apply font-mono text-eyebrow font-medium uppercase text-ink-faint;
+  }
+
+  /* Ravna ploča sa hairline okvirom — bez senki i zaobljenja. */
+  .panel {
+    @apply rounded-card border border-line bg-paper;
+  }
+
+  .panel-quiet {
+    @apply rounded-card border border-line bg-surface;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-card px-3 py-1.5
+           text-sm font-medium transition-colors disabled:cursor-not-allowed
+           disabled:opacity-45;
+  }
+
+  .btn-primary {
+    @apply btn bg-ink text-paper hover:bg-ink/85;
+  }
+
+  .btn-accent {
+    @apply btn bg-safety-500 text-paper hover:bg-safety-600;
+  }
+
+  .btn-secondary {
+    @apply btn border border-line-strong bg-paper text-ink hover:bg-surface;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-muted hover:bg-surface hover:text-ink;
+  }
+
+  .btn-danger {
+    @apply btn border border-signal-danger/30 bg-signal-dangerBg text-signal-danger hover:bg-signal-danger hover:text-paper;
+  }
+
+  .input {
+    @apply w-full rounded-card border border-line-strong bg-paper px-2.5 py-1.5 text-sm
+           text-ink placeholder:text-ink-faint focus:border-safety-400;
+  }
+
+  .label {
+    @apply mb-1 block text-micro font-medium uppercase tracking-wider text-ink-muted;
+  }
+
+  .hint {
+    @apply mt-1 text-micro text-ink-faint;
+  }
+
+  .th {
+    @apply whitespace-nowrap px-3 py-2 text-left text-eyebrow font-medium uppercase text-ink-faint;
+  }
+
+  .td {
+    @apply px-3 py-2.5 align-middle text-sm text-ink;
+  }
+
+  .row {
+    @apply border-t border-line hover:bg-surface;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-card px-1.5 py-0.5 font-mono text-eyebrow
+           font-medium uppercase;
+  }
+
+  /* Vertikalna „kičma" dosijea — tanka linija sa zarezima. */
+  .rule-ticks {
+    background-image: repeating-linear-gradient(
+      to right,
+      theme('colors.line.strong') 0 1px,
+      transparent 1px 9px
+    );
+  }
+}
