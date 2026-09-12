@@ -9,7 +9,6 @@ import { napraviPresek } from '../lib/izbor';
 import { useSada, inicijali } from '../lib/format';
 import { ULOGE } from '../lib/permissions';
 import type { Permission } from '../lib/types';
-import { Ticker } from './Ticker';
 
 type Stavka = {
   to: string;
@@ -139,7 +138,6 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
 
         <main className="min-w-0 flex-1">
-          <Ticker presek={presek} />
           <div key={lokacija.pathname} className="animate-rise px-4 py-5 lg:px-7 lg:py-7">
             {children}
           </div>
@@ -203,7 +201,7 @@ export function SaDosijeom({ children, dosije }: { children: ReactNode; dosije: 
   return (
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19.5rem]">
       <div className="min-w-0 space-y-5">{children}</div>
-      <aside className="space-y-4 xl:sticky xl:top-4">{dosije}</aside>
+      <aside className="space-y-4">{dosije}</aside>
     </div>
   );
 }

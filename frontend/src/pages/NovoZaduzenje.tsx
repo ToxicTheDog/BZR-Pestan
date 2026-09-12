@@ -236,7 +236,7 @@ export function NovoZaduzenje() {
         </div>
 
         {/* Uska rekapitulacija */}
-        <aside className="space-y-4 xl:sticky xl:top-4">
+        <aside className="space-y-4">
           <Odeljak naslov="Rekapitulacija" nadnaslov="Zaduženje" ravno>
             <dl className="divide-y divide-line">
               <Stavka label="Zaposleni" vrednost={zaposleni ? punoIme(zaposleni) : 'nije izabran'} />

@@ -1,18 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, Pencil, Printer } from 'lucide-react';
+import { FilePlus2, Mail, Pencil, Printer } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { nadjiNalog, nadjiOpremu, punoIme, rokZaduzenja } from '../lib/izbor';
 import { danaDo, datum, datumVreme, sadrzi, useSada } from '../lib/format';
-import type { Zaposleni } from '../lib/types';
+import type { Karton, Zaposleni } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
 import { Modal, Oznaka, Polje, Prazno, Pretraga, useToast } from '../components/ui';
-import { RokOznaka } from '../components/Rok';
-import { PrikazPotpisa } from '../components/Potpis';
+import { NAZIV_ROKA, TON_ROKA } from '../components/Rok';
+import { PotpisPad } from '../components/Potpis';
 
 /**
- * Lični karton zaduženja LZO — na ekranu dosije, na štampi obrazac.
- * Leva kolona je gusta lista zaposlenih, desno je sam karton.
+ * Lični karton zaduženja LZO (Obrazac 6).
+ *
+ * Karton se jednom otvara — tada ga potpisuju sve tri strane (zaposleni,
+ * uslužilac i lice za BZR) i podaci iz obrasca se upisuju na zaposlenog.
+ * Svako kasnije zaduženje u kartonu nosi samo potpis uslužioca koji izdaje.
+ *
+ * Ceo dokument je jedna tabela: zaglavlje sa podacima stoji u `<thead>`, pa ga
+ * pregledač pri štampi ponavlja na svakoj novoj strani.
  */
 export function Kartoni() {
   const { baza, akcije, smem } = useStore();
@@ -21,23 +27,31 @@ export function Kartoni() {
   const [params, setParams] = useSearchParams();
   const [pretraga, setPretraga] = useState('');
   const [izmena, setIzmena] = useState<Zaposleni | null>(null);
+  const [otvaranje, setOtvaranje] = useState<Zaposleni | null>(null);
 
   const lista = useMemo(
     () =>
       baza.zaposleni.filter(
-        (z) => !pretraga || sadrzi(punoIme(z), pretraga) || sadrzi(z.radnoMesto, pretraga) || sadrzi(z.organizacionaJedinica, pretraga),
+        (z) =>
+          !pretraga ||
+          sadrzi(punoIme(z), pretraga) ||
+          sadrzi(z.radnoMesto, pretraga) ||
+          sadrzi(z.organizacionaJedinica, pretraga),
       ),
     [baza.zaposleni, pretraga],
   );
 
   const izabranId = params.get('z') ?? lista[0]?.id ?? '';
   const zaposleni = baza.zaposleni.find((z) => z.id === izabranId);
+  const karton = baza.kartoni.find((k) => k.zaposleniId === izabranId) ?? null;
 
   const zaduzenja = baza.zaduzenja
     .filter((z) => z.zaposleniId === izabranId && z.status !== 'odbijeno')
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   const aktivna = zaduzenja.filter((z) => z.status === 'aktivno');
+  const razduzenjeZa = (zaduzenjeId: string) =>
+    baza.razduzenja.find((r) => r.zaduzenjeId === zaduzenjeId);
 
   return (
     <>
@@ -48,7 +62,12 @@ export function Kartoni() {
         akcije={
           zaposleni && (
             <>
-              {smem('mail.posalji') && (
+              {!karton && smem('kartoni.upis') && (
+                <button className="btn-accent" onClick={() => setOtvaranje(zaposleni)}>
+                  <FilePlus2 size={15} /> Otvori karton
+                </button>
+              )}
+              {karton && smem('mail.posalji') && (
                 <button
                   className="btn-secondary"
                   onClick={() => {
@@ -56,36 +75,39 @@ export function Kartoni() {
                       za: zaposleni.email,
                       zaIme: punoIme(zaposleni),
                       tema: `Lični karton LZO — ${punoIme(zaposleni)}`,
-                      telo: `U prilogu je vaš lični karton sa ${aktivna.length} aktivnih zaduženja.`,
+                      telo: `U prilogu je vaš lični karton ${karton.broj} sa ${aktivna.length} aktivnih zaduženja.`,
                       sablonId: null,
                       vezano: null,
                     });
                     javi(`Karton je poslat na ${zaposleni.email}.`);
                   }}
                 >
-                  <Mail size={15} /> Pošalji karton
+                  <Mail size={15} /> Pošalji
                 </button>
               )}
-              {smem('kartoni.upis') && (
+              {karton && smem('kartoni.upis') && (
                 <button className="btn-secondary" onClick={() => setIzmena(zaposleni)}>
-                  <Pencil size={15} /> Popuni karton
+                  <Pencil size={15} /> Dopuni
                 </button>
               )}
-              <button className="btn-primary" onClick={() => window.print()}>
-                <Printer size={15} /> Štampaj
-              </button>
+              {karton && (
+                <button className="btn-primary" onClick={() => window.print()}>
+                  <Printer size={15} /> Štampaj
+                </button>
+              )}
             </>
           )
         }
       />
 
       <div className="grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <aside className="no-print panel overflow-hidden lg:sticky lg:top-4">
+        <aside className="no-print panel overflow-hidden">
           <div className="border-b border-line p-2">
             <Pretraga value={pretraga} onChange={setPretraga} placeholder="Zaposleni…" sirina="w-full" />
           </div>
           <ul className="max-h-[70vh] divide-y divide-line overflow-y-auto">
             {lista.map((z) => {
+              const imaKarton = baza.kartoni.some((k) => k.zaposleniId === z.id);
               const broj = baza.zaduzenja.filter((x) => x.zaposleniId === z.id && x.status === 'aktivno').length;
               return (
                 <li key={z.id}>
@@ -99,7 +121,11 @@ export function Kartoni() {
                       <span className="block truncate text-sm font-medium">{punoIme(z)}</span>
                       <span className="block truncate text-micro text-ink-faint">{z.organizacionaJedinica}</span>
                     </span>
-                    <span className="font-mono text-micro text-ink-faint tnum">{broj}</span>
+                    {imaKarton ? (
+                      <span className="font-mono text-micro text-ink-faint tnum">{broj}</span>
+                    ) : (
+                      <span className="chip bg-surface-deep text-ink-faint">nema</span>
+                    )}
                   </button>
                 </li>
               );
@@ -111,133 +137,182 @@ export function Kartoni() {
           <div className="panel">
             <Prazno naslov="Izaberite zaposlenog" hint="Karton se prikazuje za izabranog zaposlenog." />
           </div>
+        ) : !karton ? (
+          <div className="panel">
+            <Prazno
+              naslov={`${punoIme(zaposleni)} još nema otvoren karton`}
+              hint="Karton se otvara jednom: unesu se podaci zaposlenog i potpisuju ga sve tri strane. Posle toga svako zaduženje nosi samo potpis uslužioca."
+              akcija={
+                smem('kartoni.upis') && (
+                  <button className="btn-accent" onClick={() => setOtvaranje(zaposleni)}>
+                    <FilePlus2 size={15} /> Otvori karton
+                  </button>
+                )
+              }
+            />
+          </div>
         ) : (
-          <article className="panel px-5 py-5 lg:px-7 lg:py-7">
-            {/* Zaglavlje obrasca */}
-            <header className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-ink pb-3">
-              <div>
-                <div className="eyebrow">{baza.podesavanja.firma.naziv}</div>
-                <h2 className="text-lg font-semibold tracking-tight">
-                  Lični karton o zaduženju sredstvima i opremom za ličnu zaštitu na radu
-                </h2>
-                <p className="mt-0.5 text-micro text-ink-muted">
-                  Obrazac 6 · {baza.podesavanja.firma.adresa} · PIB {baza.podesavanja.firma.pib}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="eyebrow">Karton broj</div>
-                <div className="font-mono text-sm font-semibold tnum">
-                  KRT-{zaposleni.id.toUpperCase().slice(-4)}
-                </div>
-              </div>
-            </header>
-
-            <dl className="grid gap-x-6 gap-y-3 border-b border-line py-4 sm:grid-cols-3">
-              <Stavka label="Ime i prezime" vrednost={punoIme(zaposleni)} />
-              <Stavka label="Radno mesto" vrednost={zaposleni.radnoMesto} />
-              <Stavka label="Organizaciona jedinica" vrednost={zaposleni.organizacionaJedinica} />
-              <Stavka label="Lokacija rada" vrednost={zaposleni.lokacija} />
-              <Stavka label="U radnom odnosu od" vrednost={datum(zaposleni.datumZaposlenja)} mono />
-              <Stavka label="Broj obuće / konfekcija" vrednost={`${zaposleni.brojCipela} / ${zaposleni.konfekcija}`} mono />
-              <Rok label="Lekarski pregled važi do" iso={zaposleni.lekarskiVazi} />
-              <Rok label="Obuka BZR važi do" iso={zaposleni.obukaBzrVazi} />
-              <Stavka label="Lice za BZR" vrednost={baza.podesavanja.firma.liceZaBzr} />
-            </dl>
-
-            <div className="py-4">
-              <div className="eyebrow mb-2">Zadužena oprema</div>
-              {zaduzenja.length === 0 ? (
-                <Prazno naslov="Zaposleni nema evidentiranih zaduženja" />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] border-y border-line">
-                    <thead>
-                      <tr className="bg-surface">
-                        <th className="th w-10">R.b.</th>
-                        <th className="th">Oprema</th>
-                        <th className="th w-24">Izdato</th>
-                        <th className="th w-24">Rok do</th>
-                        <th className="th w-36">Stanje roka</th>
-                        <th className="th w-28">Izdao</th>
-                        <th className="th w-20">Potpis</th>
+          <article className="karton panel px-5 py-5 lg:px-7 lg:py-6">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px]">
+                {/* Zaglavlje je u thead — pri štampi se ponavlja na svakoj strani. */}
+                <thead>
+                  <tr>
+                    <th colSpan={8} className="p-0 text-left font-normal">
+                      <ZaglavljeKartona karton={karton} zaposleni={zaposleni} />
+                    </th>
+                  </tr>
+                  <tr className="bg-surface">
+                    <th className="th w-9">R.b.</th>
+                    <th className="th">Oprema</th>
+                    <th className="th w-24">Izdato</th>
+                    <th className="th w-24">Rok do</th>
+                    <th className="th w-24">Razduženo</th>
+                    <th className="th w-28">Stanje roka</th>
+                    <th className="th w-28">Izdao</th>
+                    <th className="th w-24">Potpis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zaduzenja.length === 0 && (
+                    <tr>
+                      <td className="td text-ink-muted" colSpan={8}>
+                        Karton je otvoren, ali još nema evidentiranih zaduženja.
+                      </td>
+                    </tr>
+                  )}
+                  {zaduzenja.map((z, i) => {
+                    const rok = rokZaduzenja(baza, z, sada);
+                    const raz = razduzenjeZa(z.id);
+                    const izdao = nadjiNalog(baza, z.izdaoId);
+                    return (
+                      <tr key={z.id} className="row align-top">
+                        <td className="td font-mono text-micro tnum">{i + 1}.</td>
+                        <td className="td">
+                          <ul className="space-y-0.5">
+                            {z.stavke.map((s) => {
+                              const o = nadjiOpremu(baza, s.opremaId);
+                              return (
+                                <li key={s.opremaId} className="text-sm">
+                                  {o?.naziv}
+                                  {s.kolicina > 1 && ` ×${s.kolicina}`}
+                                  <span className="ml-1.5 whitespace-nowrap font-mono text-eyebrow text-ink-faint">
+                                    {o?.inv}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          <div className="font-mono text-eyebrow text-ink-faint tnum">{z.broj}</div>
+                        </td>
+                        <td className="td font-mono text-micro tnum">{datum(z.signedAt)}</td>
+                        <td className="td font-mono text-micro tnum">{datum(z.dueAt)}</td>
+                        <td className="td font-mono text-micro tnum">
+                          {raz ? (
+                            datum(raz.vracenoAt)
+                          ) : (
+                            <span className="text-ink-faint">—</span>
+                          )}
+                        </td>
+                        <td className="td">
+                          {z.status === 'aktivno' ? (
+                            <Oznaka ton={TON_ROKA[rok.status]}>{NAZIV_ROKA[rok.status]}</Oznaka>
+                          ) : (
+                            <Oznaka ton="neutral">
+                              {z.status === 'razduzeno' ? 'razduženo' : z.status.replace('_', ' ')}
+                            </Oznaka>
+                          )}
+                        </td>
+                        <td className="td text-micro">{izdao?.fullName ?? '—'}</td>
+                        <td className="td">
+                          {/* Posle otvaranja kartona potpisuje samo onaj ko izdaje opremu. */}
+                          {z.potpisIzdavaoca ? (
+                            <img src={z.potpisIzdavaoca} alt="Potpis uslužioca" className="h-7 object-contain object-left" />
+                          ) : (
+                            <span className="text-micro text-ink-faint">—</span>
+                          )}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {zaduzenja.map((z, i) => {
-                        const rok = rokZaduzenja(baza, z, sada);
-                        return (
-                          <tr key={z.id} className="row align-top">
-                            <td className="td font-mono text-micro tnum">{i + 1}.</td>
-                            <td className="td">
-                              <ul className="space-y-0.5">
-                                {z.stavke.map((s) => {
-                                  const o = nadjiOpremu(baza, s.opremaId);
-                                  return (
-                                    <li key={s.opremaId} className="text-sm">
-                                      {o?.naziv}
-                                      {s.kolicina > 1 && ` ×${s.kolicina}`}
-                                      <span className="ml-1.5 whitespace-nowrap font-mono text-eyebrow text-ink-faint">{o?.inv}</span>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                              <div className="font-mono text-eyebrow text-ink-faint tnum">{z.broj}</div>
-                            </td>
-                            <td className="td font-mono text-micro tnum">{datum(z.signedAt)}</td>
-                            <td className="td font-mono text-micro tnum">{datum(z.dueAt)}</td>
-                            <td className="td">
-                              {z.status === 'aktivno' ? (
-                                <RokOznaka rok={rok} sitno />
-                              ) : (
-                                <Oznaka ton="neutral">
-                                  {z.status === 'razduzeno' ? 'razduženo' : z.status.replace('_', ' ')}
-                                </Oznaka>
-                              )}
-                            </td>
-                            <td className="td text-micro">{nadjiNalog(baza, z.izdaoId)?.fullName ?? '—'}</td>
-                            <td className="td">
-                              {z.potpisPrimaoca ? (
-                                <img src={z.potpisPrimaoca} alt="Potpis" className="h-8 object-contain object-left" />
-                              ) : (
-                                <span className="text-micro text-ink-faint">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            <footer className="grid gap-6 border-t border-line pt-5 sm:grid-cols-3">
-              <PrikazPotpisa
-                potpis={zaduzenja.find((z) => z.potpisPrimaoca)?.potpisPrimaoca ?? null}
-                ime={punoIme(zaposleni)}
-                uloga="Zaposleni"
-              />
-              <PrikazPotpisa
-                potpis={nadjiNalog(baza, zaduzenja[0]?.izdaoId ?? null)?.potpis ?? null}
-                ime={nadjiNalog(baza, zaduzenja[0]?.izdaoId ?? null)?.fullName ?? '—'}
+            <footer className="mt-5 grid gap-6 border-t border-line pt-4 sm:grid-cols-3">
+              <PotpisKartona potpis={karton.potpisZaposlenog} ime={punoIme(zaposleni)} uloga="Zaposleni" />
+              <PotpisKartona
+                potpis={karton.potpisUsluzioca}
+                ime={nadjiNalog(baza, karton.kreiraoId)?.fullName ?? '—'}
                 uloga="Uslužilac"
               />
-              <PrikazPotpisa
-                potpis={baza.nalozi.find((n) => n.fullName === baza.podesavanja.firma.liceZaBzr)?.potpis ?? null}
-                ime={baza.podesavanja.firma.liceZaBzr}
-                uloga="Lice za BZR"
-              />
+              <PotpisKartona potpis={karton.potpisLicaBzr} ime={karton.liceZaBzr} uloga="Lice za BZR" />
             </footer>
 
-            <p className="mt-4 font-mono text-eyebrow uppercase text-ink-faint">
-              Karton odštampan {datumVreme(new Date().toISOString())} · demo podaci
+            <p className="mt-3 font-mono text-eyebrow uppercase text-ink-faint">
+              Karton otvoren {datumVreme(karton.kreiranAt)} · odštampano {datumVreme(new Date().toISOString())}
             </p>
           </article>
         )}
       </div>
 
-      <IzmenaKartona zaposleni={izmena} onClose={() => setIzmena(null)} />
+      <DopunaKartona zaposleni={izmena} onClose={() => setIzmena(null)} />
+      <OtvaranjeKartona zaposleni={otvaranje} onClose={() => setOtvaranje(null)} />
     </>
+  );
+}
+
+function ZaglavljeKartona({ karton, zaposleni }: { karton: Karton; zaposleni: Zaposleni }) {
+  const { baza } = useStore();
+  const f = baza.podesavanja.firma;
+  return (
+    <div className="mb-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-ink pb-2">
+        <div>
+          <div className="eyebrow">{f.naziv}</div>
+          <h2 className="text-base font-semibold tracking-tight">
+            Lični karton o zaduženju sredstvima i opremom za ličnu zaštitu na radu
+          </h2>
+          <p className="text-micro text-ink-muted">
+            Obrazac 6 · {f.adresa} · PIB {f.pib}
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="eyebrow">Karton broj</div>
+          <div className="font-mono text-sm font-semibold tnum">{karton.broj}</div>
+        </div>
+      </div>
+
+      <dl className="grid gap-x-6 gap-y-1.5 border-b border-line py-2.5 sm:grid-cols-3">
+        <Stavka label="Ime i prezime" vrednost={punoIme(zaposleni)} />
+        <Stavka label="Radno mesto" vrednost={zaposleni.radnoMesto} />
+        <Stavka label="Organizaciona jedinica" vrednost={zaposleni.organizacionaJedinica} />
+        <Stavka label="Lokacija rada" vrednost={zaposleni.lokacija} />
+        <Stavka label="U radnom odnosu od" vrednost={datum(zaposleni.datumZaposlenja)} mono />
+        <Stavka label="Broj obuće / konfekcija" vrednost={`${zaposleni.brojCipela} / ${zaposleni.konfekcija}`} mono />
+        <RokPolje label="Lekarski pregled važi do" iso={zaposleni.lekarskiVazi} />
+        <RokPolje label="Obuka BZR važi do" iso={zaposleni.obukaBzrVazi} />
+        <Stavka label="Lice za BZR" vrednost={karton.liceZaBzr} />
+      </dl>
+    </div>
+  );
+}
+
+function PotpisKartona({ potpis, ime, uloga }: { potpis: string | null; ime: string; uloga: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="flex h-12 items-end border-b border-ink/70 px-1">
+        {potpis ? (
+          <img src={potpis} alt={`Potpis — ${ime}`} className="max-h-full max-w-full object-contain object-left-bottom" />
+        ) : (
+          <span className="pb-1 font-mono text-micro text-ink-faint">nije potpisano</span>
+        )}
+      </div>
+      <div className="mt-1 flex items-baseline justify-between gap-2">
+        <span className="truncate text-micro font-medium">{ime}</span>
+        <span className="eyebrow shrink-0">{uloga}</span>
+      </div>
+    </div>
   );
 }
 
@@ -250,7 +325,7 @@ function Stavka({ label, vrednost, mono }: { label: string; vrednost: string; mo
   );
 }
 
-function Rok({ label, iso }: { label: string; iso: string | null }) {
+function RokPolje({ label, iso }: { label: string; iso: string | null }) {
   const d = danaDo(iso);
   const istekao = d !== null && d < 0;
   const blizu = d !== null && d >= 0 && d <= 30;
@@ -266,37 +341,170 @@ function Rok({ label, iso }: { label: string; iso: string | null }) {
   );
 }
 
-function IzmenaKartona({ zaposleni, onClose }: { zaposleni: Zaposleni | null; onClose: () => void }) {
+/* ----------------------- Otvaranje novog kartona ----------------------- */
+
+function OtvaranjeKartona({ zaposleni, onClose }: { zaposleni: Zaposleni | null; onClose: () => void }) {
+  const { baza, akcije, ja } = useStore();
+  const javi = useToast();
+  const [podaci, setPodaci] = useState<Partial<Zaposleni>>({});
+  const [napomena, setNapomena] = useState('');
+  const [potpisZaposlenog, setPotpisZaposlenog] = useState<string | null>(null);
+  const [potpisLicaBzr, setPotpisLicaBzr] = useState<string | null>(null);
+
+  if (!zaposleni) return null;
+  const v = { ...zaposleni, ...podaci };
+  const liceBzr = baza.podesavanja.firma.liceZaBzr;
+  const potpisBzrNaloga = baza.nalozi.find((n) => n.fullName === liceBzr)?.potpis ?? null;
+  const konacniBzr = potpisLicaBzr ?? (ja?.fullName === liceBzr ? ja.potpis : potpisBzrNaloga);
+  const moze = Boolean(potpisZaposlenog) && Boolean(ja?.potpis) && Boolean(konacniBzr);
+
+  const zatvori = () => {
+    setPodaci({});
+    setNapomena('');
+    setPotpisZaposlenog(null);
+    setPotpisLicaBzr(null);
+    onClose();
+  };
+
+  return (
+    <Modal
+      open
+      onClose={zatvori}
+      naslov={`Otvaranje kartona — ${punoIme(zaposleni)}`}
+      opis="Podaci uneti ovde upisuju se i na zaposlenog. Karton pri otvaranju potpisuju sve tri strane."
+      sirina="max-w-3xl"
+      podnozje={
+        <>
+          <button className="btn-secondary" onClick={zatvori}>Odustani</button>
+          <button
+            className="btn-accent"
+            disabled={!moze}
+            onClick={() => {
+              const k = akcije.napraviKarton({
+                zaposleniId: zaposleni.id,
+                podaciZaposlenog: podaci,
+                potpisZaposlenog,
+                potpisUsluzioca: ja?.potpis ?? null,
+                potpisLicaBzr: konacniBzr,
+                napomena,
+              });
+              javi(`Karton ${k.broj} je otvoren i potpisan.`);
+              zatvori();
+            }}
+          >
+            Otvori i potpiši karton
+          </button>
+        </>
+      }
+    >
+      <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2 panel-quiet px-3 py-2">
+            <div className="eyebrow">Zaposleni iz evidencije</div>
+            <div className="text-sm font-medium">{punoIme(zaposleni)}</div>
+            <div className="text-micro text-ink-muted">{zaposleni.email}</div>
+          </div>
+          <Polje label="Radno mesto">
+            <input className="input" value={v.radnoMesto} onChange={(e) => setPodaci({ ...podaci, radnoMesto: e.target.value })} />
+          </Polje>
+          <Polje label="Organizaciona jedinica">
+            <input className="input" value={v.organizacionaJedinica} onChange={(e) => setPodaci({ ...podaci, organizacionaJedinica: e.target.value })} />
+          </Polje>
+          <Polje label="Lokacija rada">
+            <input className="input" value={v.lokacija} onChange={(e) => setPodaci({ ...podaci, lokacija: e.target.value })} />
+          </Polje>
+          <Polje label="Broj obuće">
+            <input className="input font-mono tnum" value={v.brojCipela} onChange={(e) => setPodaci({ ...podaci, brojCipela: e.target.value })} />
+          </Polje>
+          <Polje label="Veličina konfekcije">
+            <input className="input font-mono" value={v.konfekcija} onChange={(e) => setPodaci({ ...podaci, konfekcija: e.target.value })} />
+          </Polje>
+          <Polje label="Lekarski važi do">
+            <input
+              type="date"
+              className="input font-mono"
+              value={v.lekarskiVazi ? v.lekarskiVazi.slice(0, 10) : ''}
+              onChange={(e) => setPodaci({ ...podaci, lekarskiVazi: e.target.value ? new Date(e.target.value).toISOString() : null })}
+            />
+          </Polje>
+          <div className="sm:col-span-2">
+            <Polje label="Napomena uz karton">
+              <input className="input" value={napomena} onChange={(e) => setNapomena(e.target.value)} />
+            </Polje>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <PotpisPad label={`Potpis zaposlenog — ${punoIme(zaposleni)}`} visina={96} onChange={setPotpisZaposlenog} />
+
+          <div>
+            <span className="label">Potpis uslužioca — {ja?.fullName}</span>
+            <div className="flex h-[74px] items-end rounded-card border border-line-strong bg-surface px-3 pb-2">
+              {ja?.potpis ? (
+                <img src={ja.potpis} alt="Potpis uslužioca" className="max-h-full object-contain object-left-bottom" />
+              ) : (
+                <span className="pb-1 text-micro text-signal-warn">
+                  Nemate sačuvan potpis — postavite ga u „Moj nalog".
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <span className="label">Potpis lica za BZR — {liceBzr}</span>
+            {konacniBzr && !potpisLicaBzr ? (
+              <div className="flex h-[74px] items-end rounded-card border border-line-strong bg-surface px-3 pb-2">
+                <img src={konacniBzr} alt="Potpis lica za BZR" className="max-h-full object-contain object-left-bottom" />
+              </div>
+            ) : (
+              <PotpisPad label=" " visina={74} onChange={setPotpisLicaBzr} />
+            )}
+          </div>
+
+          {!moze && (
+            <p className="text-micro text-signal-warn">
+              Za otvaranje kartona potrebna su sva tri potpisa.
+            </p>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------- Dopuna podataka na već otvorenom ------------------- */
+
+function DopunaKartona({ zaposleni, onClose }: { zaposleni: Zaposleni | null; onClose: () => void }) {
   const { akcije } = useStore();
   const javi = useToast();
   const [podaci, setPodaci] = useState<Partial<Zaposleni>>({});
 
   if (!zaposleni) return null;
   const v = { ...zaposleni, ...podaci };
+  const zatvori = () => {
+    setPodaci({});
+    onClose();
+  };
 
   return (
     <Modal
       open
-      onClose={() => {
-        setPodaci({});
-        onClose();
-      }}
-      naslov={`Popunjavanje kartona — ${punoIme(zaposleni)}`}
-      opis="Podaci koji se upisuju u zaglavlje obrasca."
+      onClose={zatvori}
+      naslov={`Dopuna kartona — ${punoIme(zaposleni)}`}
+      opis="Izmene se upisuju na zaposlenog i odmah se vide u zaglavlju kartona."
       sirina="max-w-2xl"
       podnozje={
         <>
-          <button className="btn-secondary" onClick={() => { setPodaci({}); onClose(); }}>Odustani</button>
+          <button className="btn-secondary" onClick={zatvori}>Odustani</button>
           <button
             className="btn-primary"
             onClick={() => {
               akcije.izmeniZaposlenog(zaposleni.id, podaci);
               javi('Karton je ažuriran.');
-              setPodaci({});
-              onClose();
+              zatvori();
             }}
           >
-            Snimi karton
+            Snimi
           </button>
         </>
       }

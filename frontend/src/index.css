@@ -38,9 +38,59 @@
     }
   }
 
+  /* Štampa kartona: sve na jednu stranu, a ako pređe — zaglavlje se ponavlja. */
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
   @media print {
     .no-print {
       display: none !important;
+    }
+
+    body {
+      background: #fff;
+    }
+
+    /* Zaglavlje tabele (podaci firme i zaposlenog) ide na svaku novu stranu. */
+    thead {
+      display: table-header-group;
+    }
+
+    tr,
+    img,
+    dl {
+      break-inside: avoid;
+    }
+
+    /* Karton se štampa bez okvira i gušće, da stane na jednu stranu. */
+    .karton {
+      border: 0 !important;
+      padding: 0 !important;
+      font-size: 9pt;
+    }
+
+    .karton table {
+      min-width: 0 !important;
+      width: 100%;
+    }
+
+    .karton .td,
+    .karton .th {
+      padding: 2px 5px;
+    }
+
+    .karton h2 {
+      font-size: 11pt;
+    }
+
+    .karton img {
+      max-height: 22px;
+    }
+
+    .karton .overflow-x-auto {
+      overflow: visible !important;
     }
   }
 }
@@ -117,8 +167,8 @@
   }
 
   .chip {
-    @apply inline-flex items-center gap-1 rounded-card px-1.5 py-0.5 font-mono text-eyebrow
-           font-medium uppercase;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-card px-1.5 py-0.5
+           font-mono text-eyebrow font-medium uppercase;
   }
 
   /* Vertikalna „kičma" dosijea — tanka linija sa zarezima. */

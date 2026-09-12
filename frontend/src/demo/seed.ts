@@ -1,5 +1,5 @@
 import type {
-  Baza, Kategorija, Kontrola, Mail, Nalog, Oprema, Razduzenje, Sablon, Zaduzenje, Zaposleni,
+  Baza, Karton, Kategorija, Kontrola, Mail, Nalog, Oprema, Razduzenje, Sablon, Zaduzenje, Zaposleni,
 } from '../lib/types';
 import { PODRAZUMEVANA_PRAVA } from '../lib/permissions';
 import { otisak } from '../lib/format';
@@ -342,6 +342,31 @@ const kontrole: Kontrola[] = kontroleRed.map((r, i) => {
   };
 });
 
+/* ----------------------------- Kartoni ----------------------------- */
+
+// Karton postoji za svakog zaposlenog koji je već nešto zadužio.
+// z7 i z11 namerno ostaju bez kartona, da se u demou vidi otvaranje novog.
+const bezKartona = ['z7', 'z11'];
+const saZaduzenjem = Array.from(new Set(zaduzenja.map((z) => z.zaposleniId))).filter(
+  (id) => !bezKartona.includes(id),
+);
+const kartoni: Karton[] = saZaduzenjem.map((zapId, i) => {
+  const kreiraoId = i % 2 === 0 ? 'n2' : 'n3';
+  const usluzilac = nalozi.find((n) => n.id === kreiraoId)!;
+  return {
+    id: `kr${i + 1}`,
+    broj: `KRT-2026-${String(i + 1).padStart(4, '0')}`,
+    zaposleniId: zapId,
+    kreiranAt: pre(420 - i * 9),
+    kreiraoId,
+    potpisZaposlenog: demoPotpis(`${imeZaposlenog(zapId)}-karton`),
+    potpisUsluzioca: usluzilac.potpis,
+    potpisLicaBzr: nalozi[0].potpis,
+    liceZaBzr: 'Nikola Ivanović',
+    napomena: '',
+  };
+});
+
 /* ------------------------------ Pošta ------------------------------ */
 
 const sabloni: Sablon[] = [
@@ -434,6 +459,7 @@ export function napraviBazu(): Baza {
     zaduzenja,
     razduzenja,
     kontrole,
+    kartoni,
     mailovi,
     sabloni,
     logovi,

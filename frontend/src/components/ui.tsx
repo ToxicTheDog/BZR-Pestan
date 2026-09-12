@@ -94,7 +94,7 @@ export function Modal({
             <X size={16} />
           </button>
         </header>
-        <div className="px-5 py-4">{children}</div>
+        <div className="max-h-[72vh] overflow-y-auto px-5 py-4">{children}</div>
         {podnozje && (
           <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface px-5 py-3">
             {podnozje}

@@ -2,20 +2,28 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
 } from 'react';
 import type {
-  Baza, Kategorija, Kontrola, Mail, Nalog, Oprema, Permission, Podesavanja, Razduzenje,
+  Baza, Karton, Kategorija, Kontrola, Mail, Nalog, Oprema, Permission, Podesavanja, Razduzenje,
   Role, Sablon, StanjeVracene, Zaduzenje, Zaposleni,
 } from './types';
 import { napraviBazu } from '../demo/seed';
 import { imaPravo } from './permissions';
 import { otisak } from './format';
 
-const KLJUC = 'bzr-pestan-demo-v1';
+const KLJUC = 'bzr-pestan-demo-v2';
 const KLJUC_SESIJA = 'bzr-pestan-sesija-v1';
 
+/**
+ * Ključ nosi verziju modela: kad se u `Baza` doda nova kolekcija, verzija se
+ * podiže i stari zapis se odbacuje umesto da puca na nedostajućem polju.
+ */
 function ucitaj(): Baza {
   try {
     const sirovo = localStorage.getItem(KLJUC);
-    if (sirovo) return JSON.parse(sirovo) as Baza;
+    if (sirovo) {
+      const b = JSON.parse(sirovo) as Baza;
+      // Sanity provera: ako nedostaje bilo koja kolekcija, kreni od nule.
+      if (b.nalozi && b.oprema && b.kartoni && b.kategorije) return b;
+    }
   } catch {
     /* pokvaren zapis — vraćamo se na sveže demo podatke */
   }
@@ -48,6 +56,9 @@ type Akcije = {
   obrisiOpremu: (id: string) => void;
   izmeniKategoriju: (id: string, izmene: Partial<Kategorija>) => void;
   dodajKategoriju: (k: Omit<Kategorija, 'id'>) => void;
+  obrisiKategoriju: (id: string) => void;
+  /** Premešta opremu u drugu kategoriju; rok se dalje nasleđuje iz nove. */
+  premestiOpremu: (opremaIds: string[], kategorijaId: string) => void;
   /* zaposleni */
   dodajZaposlenog: (z: Omit<Zaposleni, 'id'>) => void;
   izmeniZaposlenog: (id: string, izmene: Partial<Zaposleni>) => void;
@@ -61,6 +72,15 @@ type Akcije = {
     zaduzenjeId: string,
     podaci: { stanje: StanjeVracene; napomena: string; potpisVratioca: string; potpisPrimaoca: string | null },
   ) => Razduzenje;
+  /* kartoni */
+  napraviKarton: (ulaz: {
+    zaposleniId: string;
+    podaciZaposlenog: Partial<Zaposleni>;
+    potpisZaposlenog: string | null;
+    potpisUsluzioca: string | null;
+    potpisLicaBzr: string | null;
+    napomena: string;
+  }) => Karton;
   /* kontrole */
   dodajKontrolu: (k: Omit<Kontrola, 'id' | 'broj'>) => void;
   zakljuciKontrolu: (
@@ -179,6 +199,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setBaza((b) =>
           saLogom({ ...b, kategorije: [...b.kategorije, { ...k, id: id('k') }] }, 'Dodata kategorija', k.naziv, k.opis, koSam()),
         );
+      },
+
+      obrisiKategoriju(katId) {
+        setBaza((b) => {
+          const kat = b.kategorije.find((k) => k.id === katId);
+          if (!kat) return b;
+          return saLogom(
+            { ...b, kategorije: b.kategorije.filter((k) => k.id !== katId) },
+            'Obrisana kategorija',
+            kat.naziv,
+            'Kategorija uklonjena iz šifarnika.',
+            koSam(),
+          );
+        });
+      },
+
+      premestiOpremu(opremaIds, kategorijaId) {
+        setBaza((b) => {
+          const kat = b.kategorije.find((k) => k.id === kategorijaId);
+          return saLogom(
+            {
+              ...b,
+              oprema: b.oprema.map((o) =>
+                opremaIds.includes(o.id) ? { ...o, kategorijaId } : o,
+              ),
+            },
+            'Premeštena oprema',
+            kat?.naziv ?? kategorijaId,
+            `${opremaIds.length} stavki premešteno u kategoriju ${kat?.naziv ?? ''}.`,
+            koSam(),
+          );
+        });
       },
 
       dodajZaposlenog(z) {
@@ -387,6 +439,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         });
         return novo;
+      },
+
+      /**
+       * Otvaranje kartona: podaci uneti u obrascu upisuju se nazad na
+       * zaposlenog, a tri potpisa se pamte uz sam karton.
+       */
+      napraviKarton(ulaz) {
+        const sada = new Date().toISOString();
+        const nov: Karton = {
+          id: id('kr'),
+          broj: sledeciBroj('KRT', baza.kartoni.map((k) => k.broj)),
+          zaposleniId: ulaz.zaposleniId,
+          kreiranAt: sada,
+          kreiraoId: ja?.id ?? 'n2',
+          potpisZaposlenog: ulaz.potpisZaposlenog,
+          potpisUsluzioca: ulaz.potpisUsluzioca,
+          potpisLicaBzr: ulaz.potpisLicaBzr,
+          liceZaBzr: baza.podesavanja.firma.liceZaBzr,
+          napomena: ulaz.napomena,
+        };
+        setBaza((b) =>
+          saLogom(
+            {
+              ...b,
+              kartoni: [nov, ...b.kartoni],
+              zaposleni: b.zaposleni.map((z) =>
+                z.id === ulaz.zaposleniId ? { ...z, ...ulaz.podaciZaposlenog } : z,
+              ),
+            },
+            'Otvoren karton',
+            nov.broj,
+            'Karton otvoren i potpisan od svih strana.',
+            koSam(),
+          ),
+        );
+        return nov;
       },
 
       dodajKontrolu(k) {

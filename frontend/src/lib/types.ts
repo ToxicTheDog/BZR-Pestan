@@ -155,6 +155,23 @@ export type Razduzenje = {
   napomena: string;
 };
 
+/**
+ * Lični karton LZO. Prvo otvaranje kartona potpisuju sve tri strane;
+ * svako kasnije zaduženje na taj karton potpisuje samo uslužilac koji izdaje.
+ */
+export type Karton = {
+  id: string;
+  broj: string;
+  zaposleniId: string;
+  kreiranAt: string;
+  kreiraoId: string;
+  potpisZaposlenog: string | null;
+  potpisUsluzioca: string | null;
+  potpisLicaBzr: string | null;
+  liceZaBzr: string;
+  napomena: string;
+};
+
 export type TipKontrole = 'periodicni' | 'lzo' | 'radno_mesto' | 'obuka';
 export type NalazKontrole = 'uredno' | 'primedbe' | 'neispravno';
 
@@ -247,6 +264,7 @@ export type Baza = {
   zaduzenja: Zaduzenje[];
   razduzenja: Razduzenje[];
   kontrole: Kontrola[];
+  kartoni: Karton[];
   mailovi: Mail[];
   sabloni: Sablon[];
   logovi: Log[];
