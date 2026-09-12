@@ -4,7 +4,7 @@ import { useStore } from '../lib/store';
 import { napraviPresek, nadjiNalog, nadjiZaposlenog, opisStavki, punoIme, rokZaduzenja } from '../lib/izbor';
 import { danaDo, datum, relativno, useSada } from '../lib/format';
 import { Zaglavlje, SaDosijeom } from '../components/Shell';
-import { Odeljak, Oznaka, Prazno, Tacka } from '../components/ui';
+import { Odeljak, Oznaka, Prazno } from '../components/ui';
 import { RokOznaka } from '../components/Rok';
 import type { Zaduzenje } from '../lib/types';
 
@@ -22,7 +22,6 @@ export function Pregled() {
       <Zaglavlje
         nadnaslov={`${pozdrav}, ${ja?.fullName.split(' ')[0] ?? ''}`}
         naslov="Pregled stanja"
-        opis="Šta gori danas, šta ističe ove nedelje i šta čeka nečiji potpis."
         akcije={
           smem('zaduzenja.izdaj') && (
             <Link to="/zaduzenja/novo" className="btn-accent">
@@ -36,7 +35,6 @@ export function Pregled() {
             <Metrika label="Isteklo" vrednost={presek.isteklo.length} ton="danger" />
             <Metrika label="Ističe ove nedelje" vrednost={presek.uskoro.length + presek.kriticno.length} ton="warn" />
             <Metrika label="Čeka odobrenje" vrednost={presek.cekaOdobrenje.length} ton="info" />
-            <Metrika label="Slobodno u magacinu" vrednost={presek.slobodnoKomada} />
           </>
         }
       />
@@ -44,16 +42,6 @@ export function Pregled() {
       <SaDosijeom
         dosije={
           <>
-            <Odeljak naslov="Magacin" nadnaslov="Stanje" ravno>
-              <dl className="divide-y divide-line">
-                <Red label="Slobodno" vrednost={presek.slobodnoKomada} />
-                <Red label="Zaduženo" vrednost={presek.zaduzenoKomada} />
-                <Red label="U servisu" vrednost={presek.uServisu} ton="warn" />
-                <Red label="Ispod min. zalihe" vrednost={presek.niskeZalihe.length} ton="warn" />
-                <Red label="Atest ističe (30 d)" vrednost={presek.atestIstice.length} ton="warn" />
-              </dl>
-            </Odeljak>
-
             <Odeljak
               naslov="Niske zalihe"
               nadnaslov="Nabavka"
@@ -225,20 +213,6 @@ function Metrika({ label, vrednost, ton }: { label: string; vrednost: number; to
         {String(vrednost).padStart(2, '0')}
       </span>
       <span className="eyebrow">{label}</span>
-    </div>
-  );
-}
-
-function Red({ label, vrednost, ton }: { label: string; vrednost: number; ton?: 'warn' }) {
-  return (
-    <div className="flex items-center justify-between gap-3 px-4 py-2">
-      <dt className="flex items-center gap-2 text-micro text-ink-muted">
-        <Tacka ton={ton === 'warn' && vrednost > 0 ? 'warn' : 'neutral'} />
-        {label}
-      </dt>
-      <dd className={`font-mono text-sm font-semibold tnum ${ton === 'warn' && vrednost > 0 ? 'text-signal-warn' : ''}`}>
-        {vrednost}
-      </dd>
     </div>
   );
 }

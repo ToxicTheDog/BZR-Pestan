@@ -154,21 +154,17 @@ export function Prijava() {
       </aside>
       </div>
 
-      {/* Moduli kao traka koja klizi preko cele širine. */}
-      <div className="group relative overflow-hidden border-t border-line">
-        <div className="flex w-max animate-ticker group-hover:[animation-play-state:paused]">
-          {['a', 'b'].map((k) => (
-            <div key={k} className="flex shrink-0 items-center" aria-hidden={k === 'b'}>
-              {MODULI.map((m, i) => (
-                <span
-                  key={`${k}${i}`}
-                  className="flex items-center gap-2 whitespace-nowrap border-r border-line px-4 py-2 font-mono text-eyebrow uppercase text-ink-muted"
-                >
-                  <span className="text-safety-500">{String(i + 1).padStart(2, '0')}</span>
-                  {m}
-                </span>
-              ))}
-            </div>
+      {/* Moduli — statičan red preko cele širine; ništa se ne pomera. */}
+      <div className="overflow-x-auto border-t border-line">
+        <div className="flex min-w-max">
+          {MODULI.map((m, i) => (
+            <span
+              key={i}
+              className="flex items-center gap-2 whitespace-nowrap border-r border-line px-4 py-2 font-mono text-eyebrow uppercase text-ink-muted"
+            >
+              <span className="text-safety-500">{String(i + 1).padStart(2, '0')}</span>
+              {m}
+            </span>
           ))}
         </div>
       </div>
