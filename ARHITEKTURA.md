@@ -12,6 +12,14 @@ Namena: naći pravo mesto za izmenu bez čitanja celog repoa. Putanje su od kore
 - **Akcenat:** `safety-*` (signalno narandžasta) — samo za primarnu radnju i oznake.
   Statusi: `signal-ok / warn / danger / info` (+ `*Bg` varijante).
 - **Rok teče od potpisa:** `dueAt = signedAt + rokDana`. Nikad od datuma kreiranja.
+- **`rokDana: 0` = trajno zaduženje** (bez roka, bez odbrojavanja). Prioritet:
+  komad opreme (`oprema.rokDana`) > kategorija > `0`. `null` na opremi znači
+  „nasledi kategoriju". Svuda gde se rok unosi stoji i prekidač „Trajno zaduženje".
+- **Tablet je glavni uređaj:** koren je `17px` (`18px` na `pointer: coarse`), sve
+  mere su u `rem`. Dodirne mete su najmanje ~44 px (`.btn`, `.input` u
+  `@media (pointer: coarse)`). Prelom `tablet:` (1120 px) drži dosije kolonu
+  pored glavne na tabletu u pejzažu.
+- **Dnevnik aktivnosti** na pregledu vidi samo ko ima `logovi.vidi` (admin).
 
 ## Frontend — `frontend/src`
 
@@ -67,6 +75,7 @@ Kolekcije za njih već postoje u bazi (prazne). Frontend do tada radi nad demo p
 | novo pravo | `lib/permissions.ts` **i** `backend/src/prava.js` (isti spisak) |
 | novo dugme/radnja | `smem('pravo')` oko njega + akcija u `store.tsx` |
 | izmena izgleda statusa | `components/Rok.tsx` ili `Oznaka` u `ui.tsx` — ne inline po stranama |
+| veličine za dodir / čitljivost | `index.css` (`html` koren + `@media (pointer: coarse)`) i `tailwind.config.js` (`ink.faint`, `micro`, `eyebrow`, `screens.tablet`) |
 | štampa kartona | `index.css` blok `@media print` + `<thead>` u `pages/Kartoni.tsx` (zaglavlje se ponavlja po strani) |
 | nova API ruta | `backend/src/rute/*.js` + montiranje u `index.js` + red u `backend/README.md` |
 

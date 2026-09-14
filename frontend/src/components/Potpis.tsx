@@ -7,6 +7,9 @@ import { otisak } from '../lib/format';
  * koordinatama platna pomnoženim sa devicePixelRatio, pa linija
  * ostaje oštra i na telefonu i na tablet-u u magacinu.
  */
+/** Na dodirnom ekranu se potpisuje prstom, pa polje mora da bude veće. */
+const NA_DODIR = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+
 export function PotpisPad({
   onChange, visina = 150, label,
 }: {
@@ -14,6 +17,7 @@ export function PotpisPad({
   visina?: number;
   label?: string;
 }) {
+  const visinaPolja = NA_DODIR ? Math.round(visina * 1.35) : visina;
   const ref = useRef<HTMLCanvasElement>(null);
   const crta = useRef(false);
   const potezi = useRef<[number, number][][]>([]);
@@ -24,7 +28,7 @@ export function PotpisPad({
     const k = c.getContext('2d')!;
     k.lineCap = 'round';
     k.lineJoin = 'round';
-    k.lineWidth = 2.2;
+    k.lineWidth = NA_DODIR ? 2.8 : 2.2;
     k.strokeStyle = '#14161A';
     return k;
   }
@@ -35,9 +39,9 @@ export function PotpisPad({
     const dpr = window.devicePixelRatio || 1;
     const sirina = c.parentElement?.clientWidth ?? 400;
     c.width = sirina * dpr;
-    c.height = visina * dpr;
+    c.height = visinaPolja * dpr;
     c.style.width = `${sirina}px`;
-    c.style.height = `${visina}px`;
+    c.style.height = `${visinaPolja}px`;
     const k = ctx();
     k.setTransform(dpr, 0, 0, dpr, 0, 0);
     nacrtaj();

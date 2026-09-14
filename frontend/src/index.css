@@ -16,8 +16,39 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /*
+   * Portal se najviše koristi na tabletu u magacinu — prst umesto miša,
+   * ruka u rukavici, često i loše svetlo. Sve mere u projektu su u `rem`,
+   * pa uvećanje korena razmiče i tekst i razmake odjednom.
+   *
+   * Osnova je podignuta za sve, ne samo za `pointer: coarse`: hibridni
+   * uređaji sa olovkom prijavljuju `fine`, a i na laptopu je ovo čitljivije.
+   */
+  html {
+    font-size: 17px;
+  }
+
+  @media (pointer: coarse) {
+    html {
+      font-size: 18px;
+    }
+  }
+
   body {
     @apply bg-paper text-ink font-sans antialiased;
+    line-height: 1.5;
+  }
+
+  /* Bez čekanja na dupli tap i bez plavog bleska pri dodiru. */
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  label {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   :focus-visible {
@@ -121,6 +152,18 @@
            disabled:opacity-45;
   }
 
+  /* Meta prsta je ~9 mm; ispod 44 px se promašuje. */
+  @media (pointer: coarse) {
+    .btn {
+      @apply min-h-[2.6rem] px-3.5;
+    }
+
+    .btn-ghost,
+    .btn-secondary {
+      @apply min-h-[2.4rem];
+    }
+  }
+
   .btn-primary {
     @apply btn bg-ink text-paper hover:bg-ink/85;
   }
@@ -146,6 +189,20 @@
            text-ink placeholder:text-ink-faint focus:border-safety-400;
   }
 
+  @media (pointer: coarse) {
+    /* 16 px je prag ispod kojeg iOS sam zumira polje pri fokusu. */
+    .input {
+      @apply min-h-[2.6rem] px-3 py-2;
+      font-size: 16px;
+    }
+
+    input[type='checkbox'],
+    input[type='radio'] {
+      width: 1.15rem;
+      height: 1.15rem;
+    }
+  }
+
   .label {
     @apply mb-1 block text-micro font-medium uppercase tracking-wider text-ink-muted;
   }
@@ -162,8 +219,19 @@
     @apply px-3 py-2.5 align-middle text-sm text-ink;
   }
 
+  @media (pointer: coarse) {
+    .th {
+      @apply py-2.5;
+    }
+
+    .td {
+      @apply py-3.5;
+    }
+  }
+
+  /* Na dodir nema hovera — red mora da odgovori na pritisak. */
   .row {
-    @apply border-t border-line hover:bg-surface;
+    @apply border-t border-line transition-colors hover:bg-surface active:bg-surface-deep;
   }
 
   .chip {

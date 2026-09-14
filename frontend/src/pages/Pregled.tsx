@@ -71,6 +71,8 @@ export function Pregled() {
               )}
             </Odeljak>
 
+            {/* Dnevnik prijava i radnji je administratorska stvar — ostali ga ne vide. */}
+            {smem('logovi.vidi') && (
             <Odeljak naslov="Poslednja aktivnost" nadnaslov="Dnevnik" ravno>
               <ul className="divide-y divide-line">
                 {baza.logovi.slice(0, 7).map((l) => (
@@ -86,6 +88,7 @@ export function Pregled() {
                 ))}
               </ul>
             </Odeljak>
+            )}
           </>
         }
       >
