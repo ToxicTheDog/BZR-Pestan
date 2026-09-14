@@ -1,8 +1,18 @@
-/* Fontovi idu u build — portal radi i bez interneta na serveru. */
-@import '@fontsource/inter-tight/400.css';
-@import '@fontsource/inter-tight/500.css';
-@import '@fontsource/inter-tight/600.css';
-@import '@fontsource/inter-tight/700.css';
+/*
+ * Fontovi idu u build — portal radi i bez interneta na serveru.
+ *
+ * Archivo za sve što se čita u toku rada (grotesk sa karakterom, uske cifre,
+ * drži se na sitnim veličinama u tabeli), Source Serif 4 za naslove i
+ * zaglavlja obrazaca — karton time izgleda kao dokument, a ne kao web strana.
+ * IBM Plex Mono za brojeve, šifre i vreme.
+ */
+@import '@fontsource/archivo/400.css';
+@import '@fontsource/archivo/500.css';
+@import '@fontsource/archivo/600.css';
+@import '@fontsource/archivo/700.css';
+@import '@fontsource/source-serif-4/400.css';
+@import '@fontsource/source-serif-4/600.css';
+@import '@fontsource/source-serif-4/700.css';
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
 @import '@fontsource/ibm-plex-mono/600.css';
@@ -137,6 +147,11 @@
     @apply font-mono text-eyebrow font-medium uppercase text-ink-faint;
   }
 
+  /* Naslov strane i zaglavlja obrazaca. */
+  .naslov {
+    @apply font-serif font-semibold tracking-[-0.01em];
+  }
+
   /* Ravna ploča sa hairline okvirom — bez senki i zaobljenja. */
   .panel {
     @apply rounded-card border border-line bg-paper;
@@ -237,6 +252,15 @@
   .chip {
     @apply inline-flex items-center gap-1 whitespace-nowrap rounded-card px-1.5 py-0.5
            font-mono text-eyebrow font-medium uppercase;
+  }
+
+  /*
+   * Karton je gusta tabela sa mnogo kolona — na ekranu ide uži razmak
+   * da stane bez bočnog skrola, na štampi je ionako još zbijeniji.
+   */
+  .karton .th,
+  .karton .td {
+    @apply px-2;
   }
 
   /* Vertikalna „kičma" dosijea — tanka linija sa zarezima. */

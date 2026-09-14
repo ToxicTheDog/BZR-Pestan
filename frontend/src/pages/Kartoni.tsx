@@ -100,12 +100,12 @@ export function Kartoni() {
         }
       />
 
-      <div className="grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <div className="grid items-start gap-5 2xl:grid-cols-[13.5rem_minmax(0,1fr)]">
         <aside className="no-print panel overflow-hidden">
           <div className="border-b border-line p-2">
             <Pretraga value={pretraga} onChange={setPretraga} placeholder="Zaposleni…" sirina="w-full" />
           </div>
-          <ul className="max-h-[70vh] divide-y divide-line overflow-y-auto">
+          <ul className="max-h-56 divide-y divide-line overflow-y-auto 2xl:max-h-[70vh]">
             {lista.map((z) => {
               const imaKarton = baza.kartoni.some((k) => k.zaposleniId === z.id);
               const broj = baza.zaduzenja.filter((x) => x.zaposleniId === z.id && x.status === 'aktivno').length;
@@ -154,29 +154,28 @@ export function Kartoni() {
         ) : (
           <article className="karton panel px-5 py-5 lg:px-7 lg:py-6">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px]">
+              <table className="w-full min-w-[720px]">
                 {/* Zaglavlje je u thead — pri štampi se ponavlja na svakoj strani. */}
                 <thead>
                   <tr>
-                    <th colSpan={8} className="p-0 text-left font-normal">
+                    <th colSpan={7} className="p-0 text-left font-normal">
                       <ZaglavljeKartona karton={karton} zaposleni={zaposleni} />
                     </th>
                   </tr>
                   <tr className="bg-surface">
                     <th className="th w-9">R.b.</th>
                     <th className="th">Oprema</th>
-                    <th className="th w-24">Izdato</th>
-                    <th className="th w-24">Rok do</th>
-                    <th className="th w-24">Razduženo</th>
-                    <th className="th w-28">Stanje roka</th>
-                    <th className="th w-28">Izdao</th>
-                    <th className="th w-24">Potpis</th>
+                    <th className="th w-20">Izdato</th>
+                    <th className="th w-20">Rok do</th>
+                    <th className="th w-20">Razduženo</th>
+                    <th className="th w-24">Stanje roka</th>
+                    <th className="th w-32">Izdao i potpis</th>
                   </tr>
                 </thead>
                 <tbody>
                   {zaduzenja.length === 0 && (
                     <tr>
-                      <td className="td text-ink-muted" colSpan={8}>
+                      <td className="td text-ink-muted" colSpan={7}>
                         Karton je otvoren, ali još nema evidentiranih zaduženja.
                       </td>
                     </tr>
@@ -223,13 +222,17 @@ export function Kartoni() {
                             </Oznaka>
                           )}
                         </td>
-                        <td className="td text-micro">{izdao?.fullName ?? '—'}</td>
+                        {/* Posle otvaranja kartona potpisuje samo onaj ko izdaje opremu. */}
                         <td className="td">
-                          {/* Posle otvaranja kartona potpisuje samo onaj ko izdaje opremu. */}
+                          <div className="text-micro">{izdao?.fullName ?? '—'}</div>
                           {z.potpisIzdavaoca ? (
-                            <img src={z.potpisIzdavaoca} alt="Potpis uslužioca" className="h-7 object-contain object-left" />
+                            <img
+                              src={z.potpisIzdavaoca}
+                              alt={`Potpis — ${izdao?.fullName ?? ''}`}
+                              className="mt-0.5 h-6 object-contain object-left"
+                            />
                           ) : (
-                            <span className="text-micro text-ink-faint">—</span>
+                            <div className="text-micro text-ink-faint">nije potpisano</div>
                           )}
                         </td>
                       </tr>
@@ -270,7 +273,7 @@ function ZaglavljeKartona({ karton, zaposleni }: { karton: Karton; zaposleni: Za
       <div className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-ink pb-2">
         <div>
           <div className="eyebrow">{f.naziv}</div>
-          <h2 className="text-base font-semibold tracking-tight">
+          <h2 className="naslov text-base">
             Lični karton o zaduženju sredstvima i opremom za ličnu zaštitu na radu
           </h2>
           <p className="text-micro text-ink-muted">

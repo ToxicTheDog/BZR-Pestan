@@ -7,8 +7,11 @@ Namena: naći pravo mesto za izmenu bez čitanja celog repoa. Putanje su od kore
 - **Jezik:** srpski, latinica — kod, komentari, nazivi promenljivih, UI tekst, commit poruke.
 - **Tema:** bela, urednička. Levi gusti rail + glavna kolona + uski „dosije" desno.
   Hairline linije (`border-line`), tabularne cifre (`tnum`), oštri radiusi (`rounded-card` = 3px).
+- **Tipografija:** `Archivo` za radni tekst, `Source Serif 4` za naslove i zaglavlja
+  obrazaca (klasa `.naslov`), `IBM Plex Mono` za brojeve, šifre i vreme. Svi su
+  samohostovani kroz `@fontsource`.
 - **Zabranjeno:** gradijenti, glow, senke na karticama, centrirana simetrija, tekst koji klizi
-  (marquee), generični 3-kolonski feature grid.
+  (marquee), generični 3-kolonski feature grid, `Inter`/`Inter Tight`.
 - **Akcenat:** `safety-*` (signalno narandžasta) — samo za primarnu radnju i oznake.
   Statusi: `signal-ok / warn / danger / info` (+ `*Bg` varijante).
 - **Rok teče od potpisa:** `dueAt = signedAt + rokDana`. Nikad od datuma kreiranja.
