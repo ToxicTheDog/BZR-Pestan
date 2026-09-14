@@ -104,7 +104,7 @@ export function Modal({
       >
         <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-3.5">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold tracking-tight">{naslov}</h2>
+            <h2 className="naslov text-base">{naslov}</h2>
             {opis && <p className="mt-0.5 text-micro text-ink-muted">{opis}</p>}
           </div>
           <button onClick={onClose} className="btn-ghost -mr-2 px-1.5" aria-label="Zatvori">
@@ -152,7 +152,7 @@ export function Fioka({
         <header className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
           <div className="min-w-0">
             {nadnaslov && <div className="eyebrow mb-1">{nadnaslov}</div>}
-            <h2 className="truncate text-lg font-semibold tracking-tight">{naslov}</h2>
+            <h2 className="naslov truncate text-lg">{naslov}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {akcije}
@@ -323,7 +323,7 @@ export function Odeljak({
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
         <div>
           {nadnaslov && <div className="eyebrow">{nadnaslov}</div>}
-          <h2 className="text-sm font-semibold tracking-tight">{naslov}</h2>
+          <h2 className="naslov text-sm">{naslov}</h2>
         </div>
         {akcije && <div className="flex flex-wrap items-center gap-1.5">{akcije}</div>}
       </header>

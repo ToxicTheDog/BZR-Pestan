@@ -43,7 +43,7 @@ export function Prijava() {
             <ShieldCheck size={19} />
           </span>
           <span className="leading-none">
-            <span className="block text-sm font-semibold tracking-tight">BZR portal</span>
+            <span className="naslov block text-[0.95rem]">BZR portal</span>
             <span className="eyebrow">Peštan d.o.o. — Aranđelovac</span>
           </span>
         </div>
@@ -53,7 +53,7 @@ export function Prijava() {
             <span className="inline-block h-2 w-10 rule-ticks" />
             Prijava na portal
           </div>
-          <h1 className="text-[2.1rem] font-semibold leading-[1.08] tracking-[-0.03em] sm:text-[2.6rem]">
+          <h1 className="naslov text-[2.15rem] leading-[1.06] sm:text-[2.7rem]">
             Bezbednost i zdravlje
             <br />
             na radu.

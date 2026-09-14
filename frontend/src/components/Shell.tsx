@@ -154,7 +154,7 @@ export function Znak() {
         <ShieldCheck size={17} />
       </span>
       <span className="leading-none">
-        <span className="block text-sm font-semibold tracking-tight">BZR portal</span>
+        <span className="naslov block text-[0.95rem]">BZR portal</span>
         <span className="eyebrow">Peštan d.o.o.</span>
       </span>
     </div>
@@ -182,7 +182,7 @@ export function Zaglavlje({
             <span className="inline-block h-2 w-6 rule-ticks" />
             {nadnaslov}
           </div>
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] lg:text-[1.7rem]">{naslov}</h1>
+          <h1 className="naslov text-2xl lg:text-[1.75rem]">{naslov}</h1>
           {opis && <p className="mt-1 max-w-2xl text-sm text-ink-muted">{opis}</p>}
         </div>
         {akcije && <div className="no-print flex flex-wrap items-center gap-1.5">{akcije}</div>}

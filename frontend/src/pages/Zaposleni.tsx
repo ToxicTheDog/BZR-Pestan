@@ -31,12 +31,6 @@ export function Zaposleni() {
     [baza.zaposleni, pretraga],
   );
 
-  const sluzbe = useMemo(() => {
-    const mapa = new Map<string, number>();
-    for (const z of baza.zaposleni) mapa.set(z.organizacionaJedinica, (mapa.get(z.organizacionaJedinica) ?? 0) + 1);
-    return [...mapa.entries()].sort((a, b) => b[1] - a[1]);
-  }, [baza.zaposleni]);
-
   return (
     <>
       <Zaglavlje
@@ -49,16 +43,6 @@ export function Zaposleni() {
               <Plus size={15} /> Dodaj zaposlenog
             </button>
           )
-        }
-        meta={
-          <>
-            {sluzbe.slice(0, 6).map(([naziv, broj]) => (
-              <span key={naziv} className="flex items-baseline gap-1.5">
-                <span className="font-mono text-sm font-semibold tnum">{broj}</span>
-                <span className="eyebrow">{naziv}</span>
-              </span>
-            ))}
-          </>
         }
       />
 
