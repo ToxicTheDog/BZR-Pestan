@@ -138,7 +138,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
 
         <main className="min-w-0 flex-1">
-          <div key={lokacija.pathname} className="animate-rise px-4 py-5 lg:px-7 lg:py-7">
+          <div key={lokacija.pathname} className="animate-fade px-4 py-5 lg:px-7 lg:py-7">
             {children}
           </div>
         </main>

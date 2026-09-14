@@ -1,7 +1,21 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Check, AlertTriangle, Info } from 'lucide-react';
+
+/**
+ * Sve što lebdi iznad strane ide direktno na `<body>`.
+ *
+ * Razlog: bilo koji predak sa `transform`, `filter` ili `contain` postaje
+ * containing block za `position: fixed` potomke — tada `inset-0` više ne
+ * znači „ceo prozor" nego „ta kutija", pa se modal ili fioka iseku. Portal
+ * to sprečava bez obzira na to šta se kasnije doda u omotač strane.
+ */
+function Sloj({ children }: { children: ReactNode }) {
+  if (typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+}
 
 /* ------------------------------ Toast ------------------------------ */
 
@@ -24,6 +38,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={javi}>
       {children}
+      <Sloj>
       <div className="no-print pointer-events-none fixed bottom-5 left-1/2 z-[60] flex w-[22rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col gap-2 lg:left-auto lg:right-6 lg:translate-x-0">
         {poruke.map((p) => {
           const I = ikona[p.ton];
@@ -45,6 +60,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           );
         })}
       </div>
+      </Sloj>
     </ToastCtx.Provider>
   );
 }
@@ -78,6 +94,7 @@ export function Modal({
   if (!open) return null;
 
   return (
+    <Sloj>
     <div className="no-print fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/35 p-4 pt-[6vh] backdrop-blur-[1px]">
       <div
         role="dialog"
@@ -102,6 +119,7 @@ export function Modal({
         )}
       </div>
     </div>
+    </Sloj>
   );
 }
 
@@ -127,6 +145,7 @@ export function Fioka({
   if (!open) return null;
 
   return (
+    <Sloj>
     <div className="no-print fixed inset-0 z-50 flex justify-end bg-ink/30">
       <button className="flex-1 cursor-default" aria-label="Zatvori" onClick={onClose} />
       <aside className="flex h-full w-full max-w-2xl animate-rise flex-col border-l border-line bg-paper shadow-pop">
@@ -145,6 +164,7 @@ export function Fioka({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
       </aside>
     </div>
+    </Sloj>
   );
 }
 

@@ -52,13 +52,15 @@ export default {
       },
       borderRadius: { card: '3px' },
       keyframes: {
-        ticker: { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-50%)' } },
         rise: { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'none' } },
+        // Bez `transform` — element sa transformacijom postaje containing block
+        // za `position: fixed` potomke, pa bi omotač strane sekao modale i fioke.
+        fade: { from: { opacity: '0' }, to: { opacity: '1' } },
         pop: { from: { opacity: '0', transform: 'translateY(10px) scale(.985)' }, to: { opacity: '1', transform: 'none' } },
       },
       animation: {
-        ticker: 'ticker 44s linear infinite',
         rise: 'rise .22s ease-out both',
+        fade: 'fade .2s ease-out both',
         pop: 'pop .18s ease-out both',
       },
     },

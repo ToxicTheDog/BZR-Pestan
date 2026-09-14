@@ -86,3 +86,8 @@ Kolekcije za njih već postoje u bazi (prazne). Frontend do tada radi nad demo p
 3. Svaka akcija piše u dnevnik (`saLogom` / `upisiLog`).
 4. `npm run build` u `frontend/` pre svakog push-a (uključuje `tsc --noEmit`).
 5. Kolona sa strane ne sme biti `sticky` — zamrzava sadržaj dok se ne skroluje do dna.
+6. **Ništa iznad strane ne sme van portala.** `Modal`, `Fioka` i toast idu kroz
+   `Sloj` (portal na `<body>`) u `ui.tsx`. Predak sa `transform`/`filter`/`contain`
+   postaje containing block za `position: fixed`, pa bi im `inset-0` značilo
+   „ta kutija" umesto „ceo prozor" i isekao bi ih. Iz istog razloga omotač strane
+   u `Shell.tsx` koristi `animate-fade` (bez transformacije), ne `animate-rise`.
