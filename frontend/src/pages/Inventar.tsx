@@ -10,8 +10,8 @@ import { danaDo, danaRec, datum, novac, sadrzi } from '../lib/format';
 import type { Kategorija, Oprema, StanjeOpreme, TipKategorije } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
 import {
-  Brojac, Fioka, Filteri, Modal, Odeljak, Oznaka, Podatak, Polje, Potvrda, Prazno, Pretraga,
-  type TonOznake, useToast,
+  Brojac, Fioka, Filteri, Modal, Odeljak, Oznaka, Podatak, Polje, Potvrda, Prazno, Prekidac,
+  Pretraga, type TonOznake, useToast,
 } from '../components/ui';
 
 /** Ikone kategorija — vrednost polja `ikona` bira jednu od ovih. */
@@ -159,7 +159,7 @@ export function Inventar() {
           }
         />
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 tablet:grid-cols-3">
           {baza.kategorije.map((k) => {
             const s = statistika(k.id);
             const I = IKONE[k.ikona] ?? Package;
@@ -658,15 +658,29 @@ function FormaKategorije({
             ))}
           </select>
         </Polje>
-        <Polje label="Rok zaduženja (dana)" hint="0 = trajno zaduženje.">
-          <input
-            type="number"
-            min={0}
-            className="input font-mono tnum"
-            value={v.rokDana}
-            onChange={(e) => postavi({ rokDana: Math.max(0, Number(e.target.value)) })}
-          />
-        </Polje>
+        <div>
+          <Polje
+            label="Rok zaduženja (dana)"
+            hint={v.rokDana > 0 ? 'Nasleđuje ga sva oprema iz kategorije.' : 'Trajno — oprema iz kategorije se ne vraća po roku.'}
+          >
+            <input
+              type="number"
+              min={0}
+              className="input font-mono tnum disabled:bg-surface disabled:text-ink-faint"
+              value={v.rokDana}
+              disabled={v.rokDana === 0}
+              onChange={(e) => postavi({ rokDana: Math.max(0, Number(e.target.value)) })}
+            />
+          </Polje>
+          <div className="mt-1 border-t border-line">
+            <Prekidac
+              ukljucen={v.rokDana === 0}
+              onChange={(t) => postavi({ rokDana: t ? 0 : 365 })}
+              label="Trajno zaduženje"
+              opis="Bez roka vraćanja."
+            />
+          </div>
+        </div>
         <div className="sm:col-span-2">
           <Polje label="Opis">
             <input className="input" value={v.opis} onChange={(e) => postavi({ opis: e.target.value })} />
@@ -793,16 +807,36 @@ function FormaOpreme({
         <Polje label="Lokacija">
           <input className="input" value={v.lokacija} onChange={(e) => postavi({ lokacija: e.target.value })} />
         </Polje>
-        <Polje label="Rok zaduženja (dana)" hint="Prazno = nasleđuje kategoriju. 0 = trajno.">
-          <input
-            type="number"
-            min={0}
-            className="input font-mono tnum"
-            value={v.rokDana ?? ''}
-            placeholder={String(kat?.rokDana ?? 0)}
-            onChange={(e) => postavi({ rokDana: e.target.value === '' ? null : Math.max(0, Number(e.target.value)) })}
-          />
-        </Polje>
+        <div>
+          <Polje
+            label="Rok zaduženja (dana)"
+            hint={
+              v.rokDana === null
+                ? `Nasleđuje kategoriju: ${kat && kat.rokDana > 0 ? danaRec(kat.rokDana) : 'trajno'}.`
+                : v.rokDana === 0
+                  ? 'Trajno — ovaj komad se ne vraća po roku.'
+                  : 'Važi samo za ovaj komad, jači je od kategorije.'
+            }
+          >
+            <input
+              type="number"
+              min={0}
+              className="input font-mono tnum disabled:bg-surface disabled:text-ink-faint"
+              value={v.rokDana ?? ''}
+              placeholder={String(kat?.rokDana ?? 0)}
+              disabled={v.rokDana === 0}
+              onChange={(e) => postavi({ rokDana: e.target.value === '' ? null : Math.max(0, Number(e.target.value)) })}
+            />
+          </Polje>
+          <div className="mt-1 border-t border-line">
+            <Prekidac
+              ukljucen={v.rokDana === 0}
+              onChange={(t) => postavi({ rokDana: t ? 0 : null })}
+              label="Trajno zaduženje"
+              opis="Bez roka vraćanja, bez obzira na kategoriju."
+            />
+          </div>
+        </div>
         <Polje label="Količina">
           <input
             type="number"

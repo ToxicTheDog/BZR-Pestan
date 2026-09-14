@@ -3,12 +3,19 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        // Tablet u pejzažu (iPad 11" je 1180–1194 px) — tu dosije kolona
+        // još uvek ima smisla, a Tailwind-ov `xl` (1280) je promašuje.
+        tablet: '1120px',
+      },
       colors: {
         // Topli, „papirni" beli sistem — dosije a ne dashboard-šablon.
         paper: '#FFFFFF',
         surface: { DEFAULT: '#F6F5F1', deep: '#EDEBE4' },
         line: { DEFAULT: '#E4E2DA', strong: '#CFCCC1' },
-        ink: { DEFAULT: '#14161A', muted: '#5C6068', faint: '#8D9099' },
+        // `faint` je namerno tamniji nego što izgleda „elegantno“ — na tabletu
+        // pod halogenim svetlom svetlo siva na beloj se jednostavno ne čita.
+        ink: { DEFAULT: '#14161A', muted: '#50545C', faint: '#6E727C' },
         // Akcenat je boja zaštitne opreme: signalno narandžasta.
         safety: {
           50: '#FEF3E9',
@@ -36,8 +43,8 @@ export default {
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       fontSize: {
-        eyebrow: ['0.6563rem', { lineHeight: '0.9rem', letterSpacing: '0.14em' }],
-        micro: ['0.6875rem', { lineHeight: '1rem' }],
+        eyebrow: ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.12em' }],
+        micro: ['0.75rem', { lineHeight: '1.15rem' }],
       },
       boxShadow: {
         pop: '0 18px 50px -12px rgba(20, 22, 26, 0.28)',
@@ -45,13 +52,15 @@ export default {
       },
       borderRadius: { card: '3px' },
       keyframes: {
-        ticker: { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-50%)' } },
         rise: { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'none' } },
+        // Bez `transform` — element sa transformacijom postaje containing block
+        // za `position: fixed` potomke, pa bi omotač strane sekao modale i fioke.
+        fade: { from: { opacity: '0' }, to: { opacity: '1' } },
         pop: { from: { opacity: '0', transform: 'translateY(10px) scale(.985)' }, to: { opacity: '1', transform: 'none' } },
       },
       animation: {
-        ticker: 'ticker 44s linear infinite',
         rise: 'rise .22s ease-out both',
+        fade: 'fade .2s ease-out both',
         pop: 'pop .18s ease-out both',
       },
     },

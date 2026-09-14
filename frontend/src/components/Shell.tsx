@@ -66,7 +66,7 @@ export function Shell({ children }: { children: ReactNode }) {
   ];
 
   const klasaLinka = ({ isActive }: { isActive: boolean }) =>
-    `group flex items-center gap-2.5 border-l-2 py-1.5 pl-3 pr-2 text-sm transition-colors ${
+    `group flex items-center gap-2.5 border-l-2 py-2 pl-3 pr-2 text-sm transition-colors ${
       isActive
         ? 'border-safety-500 bg-surface font-medium text-ink'
         : 'border-transparent text-ink-muted hover:border-line-strong hover:bg-surface hover:text-ink'
@@ -138,7 +138,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
 
         <main className="min-w-0 flex-1">
-          <div key={lokacija.pathname} className="animate-rise px-4 py-5 lg:px-7 lg:py-7">
+          <div key={lokacija.pathname} className="animate-fade px-4 py-5 lg:px-7 lg:py-7">
             {children}
           </div>
         </main>
@@ -199,7 +199,7 @@ export function Zaglavlje({
  */
 export function SaDosijeom({ children, dosije }: { children: ReactNode; dosije: ReactNode }) {
   return (
-    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19.5rem]">
+    <div className="grid items-start gap-5 tablet:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_19.5rem]">
       <div className="min-w-0 space-y-5">{children}</div>
       <aside className="space-y-4">{dosije}</aside>
     </div>

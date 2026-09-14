@@ -6,7 +6,7 @@ import { kategorijaOpreme, punoIme, vaziRok } from '../lib/izbor';
 import { danaRec, datum, sadrzi } from '../lib/format';
 import type { Oprema, StavkaZaduzenja, Zaduzenje } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
-import { Odeljak, Oznaka, Polje, Prazno, Pretraga, useToast } from '../components/ui';
+import { Odeljak, Oznaka, Polje, Prazno, Prekidac, Pretraga, useToast } from '../components/ui';
 import { DijalogPotpisa } from '../components/Dijalozi';
 
 export function NovoZaduzenje() {
@@ -122,7 +122,7 @@ export function NovoZaduzenje() {
         }
       />
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className="grid items-start gap-5 tablet:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="min-w-0 space-y-5">
           {/* Korak 1 */}
           <Odeljak
@@ -212,22 +212,35 @@ export function NovoZaduzenje() {
           {/* Korak 3 */}
           <Odeljak naslov="Rok i napomena" nadnaslov="Korak 3">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Polje
-                label="Rok zaduženja (dana)"
-                hint={
-                  predlozenRok > 0
-                    ? `Predlog iz kategorije: ${danaRec(predlozenRok)}. Uslužilac može da ga skrati ili produži.`
-                    : 'Bez roka — trajno zaduženje.'
-                }
-              >
-                <input
-                  type="number"
-                  min={0}
-                  className="input font-mono tnum"
-                  value={konacanRok}
-                  onChange={(e) => setRokDana(Math.max(0, Number(e.target.value)))}
-                />
-              </Polje>
+              <div>
+                <Polje
+                  label="Rok zaduženja (dana)"
+                  hint={
+                    konacanRok > 0
+                      ? predlozenRok > 0
+                        ? `Predlog iz kategorije: ${danaRec(predlozenRok)}. Uslužilac može da ga skrati ili produži.`
+                        : 'Rok teče od trenutka potpisa primaoca.'
+                      : 'Trajno zaduženje — oprema se ne vraća po roku i odbrojavanja nema.'
+                  }
+                >
+                  <input
+                    type="number"
+                    min={0}
+                    className="input font-mono tnum disabled:bg-surface disabled:text-ink-faint"
+                    value={konacanRok}
+                    disabled={konacanRok === 0}
+                    onChange={(e) => setRokDana(Math.max(0, Number(e.target.value)))}
+                  />
+                </Polje>
+                <div className="mt-1 divide-y divide-line border-t border-line">
+                  <Prekidac
+                    ukljucen={konacanRok === 0}
+                    onChange={(v) => setRokDana(v ? 0 : predlozenRok > 0 ? predlozenRok : 365)}
+                    label="Trajno zaduženje"
+                    opis="Bez roka vraćanja — koristi se za alat i opremu koja ostaje kod zaposlenog."
+                  />
+                </div>
+              </div>
               <Polje label="Napomena" hint="Vidljiva u kartonu, zapisniku i e-pošti.">
                 <textarea className="input min-h-[72px]" value={napomena} onChange={(e) => setNapomena(e.target.value)} />
               </Polje>
