@@ -40,12 +40,12 @@ Namena: naći pravo mesto za izmenu bez čitanja celog repoa. Putanje su od kore
 | `lib/types.ts` | **ceo model podataka** | `Baza`, `Nalog`, `Zaposleni`, `Kategorija`, `Oprema`, `Zaduzenje`, `Razduzenje`, `Karton`, `Kontrola`, `Mail`, `Log`, `Podesavanja`, `Permission`, `Role` |
 | `lib/store.tsx` | **jedino mesto koje menja podatke** + sesija; `localStorage` ključ nosi verziju | `StoreProvider`, `useStore()` -> `{ baza, akcije, ja, prijava, odjava, smem }` |
 | `lib/permissions.ts` | katalog prava, fabrička prava uloge, računanje konačnog prava | `PRAVA`, `SVA_PRAVA`, `ULOGE`, `PODRAZUMEVANA_PRAVA`, `imaPravo` |
-| `lib/izbor.ts` | izvedeni podaci (selektori) nad `baza`, uključujući nadležnost | `nadleznost`, `uNadleznosti`, `vidljiviZaposleni`, `vidljivaZaduzenja`, `vidljivaRazduzenja`, `vidljiviKartoni`, `vidljivaPosta`, `odobriociSektora`, `usluziociSektora`, `napraviPresek`, `rokZaduzenja`, `vaziRok`, `punoIme`, `nadji*` |
+| `lib/izbor.ts` | izvedeni podaci (selektori) nad `baza`, uključujući nadležnost i pretragu zaposlenih | `nadleznost`, `uNadleznosti`, `vidljiviZaposleni`, `vidljivaZaduzenja`, `vidljivaRazduzenja`, `vidljiviKartoni`, `vidljivaPosta`, `odobriociSektora`, `usluziociSektora`, `traziZaposlenog`, `poPrezimenu`, `slovoZaposlenog`, `brojAktivnihZaduzenja`, `napraviPresek`, `rokZaduzenja`, `vaziRok`, `punoIme`, `nadji*` |
 | `lib/format.ts` | datumi, pretraga bez kvačica, odbrojavanje, otisak | `datum`, `datumVreme`, `relativno`, `danaDo`, `sadrzi`, `procitajRok`, `useSada`, `otisak` |
-| `demo/seed.ts` | demo podaci; sve vreme je relativno na „sada" | `napraviBazu` |
+| `demo/seed.ts` | demo podaci; sve vreme je relativno na „sada"; 14 imenovanih zaposlenih + izvedena popuna do 660 (firma je te veličine, pa spisak mora da radi na tom broju) | `napraviBazu` |
 | `demo/potpis.ts` | generisani rukopisni potpis iz imena | `demoPotpis` |
 | `components/Shell.tsx` | rail, navigacija, zaglavlje strane, asimetrična podela | `Shell`, `Zaglavlje`, `SaDosijeom` |
-| `components/ui.tsx` | UI komplet | `Modal`, `Fioka`, `Polje`, `Pretraga`, `Prekidac`, `Oznaka`, `Tacka`, `Prazno`, `Traka`, `Odeljak`, `Podatak`, `Potvrda`, `Tabovi`, `Filteri`, `Brojac`, `useToast` |
+| `components/ui.tsx` | UI komplet | `Modal`, `Fioka`, `Polje`, `Pretraga`, `Prekidac`, `Oznaka`, `Tacka`, `Prazno`, `Traka`, `Odeljak`, `Podatak`, `Potvrda`, `Tabovi`, `Filteri`, `Brojac`, `useVise` + `Vise` (straničenje dugih spiskova), `useToast` |
 | `components/Potpis.tsx` | crtanje i prikaz potpisa | `PotpisPad`, `PrikazPotpisa`, `DigitalniBlok` |
 | `components/Rok.tsx` | status roka na jednom mestu | `RokOznaka`, `RokTraka`, `NAZIV_ROKA`, `TON_ROKA` |
 | `components/Dijalozi.tsx` | pop-up potpisa (pokreće rok) i razduženja | `DijalogPotpisa`, `DijalogRazduzenja` |
@@ -88,6 +88,8 @@ Kolekcije za njih već postoje u bazi (prazne). Frontend do tada radi nad demo p
 | veličine za dodir / čitljivost | `index.css` (`html` koren + `@media (pointer: coarse)`) i `tailwind.config.js` (`ink.faint`, `micro`, `eyebrow`, `screens.tablet`) |
 | štampa kartona | `index.css` blok `@media print` + `<thead>` u `pages/Kartoni.tsx` (zaglavlje se ponavlja po strani) |
 | nova API ruta | `backend/src/rute/*.js` + montiranje u `index.js` + red u `backend/README.md` |
+| pretraga po zaposlenima | `lib/izbor.ts` -> `traziZaposlenog` (frontend) i `backend/src/pretraga.js` -> `odgovara` (API) — menjaju se u paru, kao spisak prava |
+| dugačak spisak na strani | `useVise(lista, korak)` + `<Vise />` iz `ui.tsx`, nikad ceo spisak u DOM-u |
 
 ## Pravila koja se lako prekrše
 
@@ -99,7 +101,11 @@ Kolekcije za njih već postoje u bazi (prazne). Frontend do tada radi nad demo p
 6. **Sve što se vezuje za zaposlenog filtrira se kroz `vidljivo*` selektore.**
    Direktno čitanje `baza.zaduzenja` / `baza.zaposleni` po stranama probija
    sektorsku podelu. Isto važi za `napraviPresek`, kome se prosleđuje nalog.
-7. **Ništa iznad strane ne sme van portala.** `Modal`, `Fioka` i toast idu kroz
+7. **Spisak zaposlenih se ne crta ceo.** Preko šest stotina redova ide kroz
+   `useVise` + `<Vise />`, a pretraga kroz `traziZaposlenog` (jedan skup polja
+   za sve strane, radi i ćirilicom i bez kvačica). Brojanje po zaposlenom ide
+   kroz `brojAktivnihZaduzenja` — ne `filter` u svakom redu.
+8. **Ništa iznad strane ne sme van portala.** `Modal`, `Fioka` i toast idu kroz
    `Sloj` (portal na `<body>`) u `ui.tsx`. Predak sa `transform`/`filter`/`contain`
    postaje containing block za `position: fixed`, pa bi im `inset-0` značilo
    „ta kutija" umesto „ceo prozor" i isekao bi ih. Iz istog razloga omotač strane

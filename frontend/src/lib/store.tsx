@@ -9,7 +9,7 @@ import { napraviBazu } from '../demo/seed';
 import { imaPravo } from './permissions';
 import { otisak } from './format';
 
-const KLJUC = 'bzr-pestan-demo-v3';
+const KLJUC = 'bzr-pestan-demo-v4';
 const KLJUC_SESIJA = 'bzr-pestan-sesija-v1';
 
 /**

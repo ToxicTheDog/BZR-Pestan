@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { KeyRound, Plus, ShieldHalf, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { PRAVA, ULOGE, brojIzuzetaka, imaPravo } from '../lib/permissions';
 import { bezNadleznosti, nazivSektora } from '../lib/izbor';
-import { datumVreme, inicijali, relativno } from '../lib/format';
+import { datumVreme, inicijali, relativno, sadrzi } from '../lib/format';
 import type { Nalog, Permission, Role } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
-import { Fioka, Modal, Odeljak, Oznaka, Podatak, Polje, Potvrda, Prekidac, useToast } from '../components/ui';
+import {
+  Fioka, Modal, Odeljak, Oznaka, Podatak, Polje, Potvrda, Prekidac, Pretraga, useToast,
+} from '../components/ui';
 
 /** „1 izuzetak", „2 izuzetka", „5 izuzetaka" — broj mora da se slaže sa rečju. */
 function izuzetakRec(n: number): string {
@@ -30,8 +32,24 @@ export function Nalozi() {
   const [prava, setPrava] = useState<Nalog | null>(null);
   const [brisanje, setBrisanje] = useState<Nalog | null>(null);
   const [reset, setReset] = useState<Nalog | null>(null);
+  const [pretragaSektora, setPretragaSektora] = useState('');
 
   const nalog = prava ? baza.nalozi.find((n) => n.id === prava.id) ?? null : null;
+
+  /** Broj zaposlenih po sektoru u jednom prolazu — evidencija ide na stotine imena. */
+  const brojPoSektoru = useMemo(() => {
+    const mapa = new Map<string, number>();
+    for (const z of baza.zaposleni) mapa.set(z.sektorId, (mapa.get(z.sektorId) ?? 0) + 1);
+    return mapa;
+  }, [baza.zaposleni]);
+
+  const sektoriZaDodelu = useMemo(
+    () =>
+      baza.sektori.filter(
+        (s) => !pretragaSektora || sadrzi(s.naziv, pretragaSektora) || sadrzi(s.sifra, pretragaSektora) || sadrzi(s.opis, pretragaSektora),
+      ),
+    [baza.sektori, pretragaSektora],
+  );
 
   return (
     <>
@@ -196,7 +214,15 @@ export function Nalozi() {
               <Podatak label="Sertifikat" mono>{nalog.sertifikat ?? 'nije izdat'}</Podatak>
             </div>
 
-            <Odeljak naslov="Nadležnost po sektorima" nadnaslov="Koga vidi i kome odobrava" ravno>
+            <Odeljak
+              naslov="Nadležnost po sektorima"
+              nadnaslov={
+                nalog.sviSektori
+                  ? 'Cela firma'
+                  : `${(nalog.sektori ?? []).length} od ${baza.sektori.length} sektora`
+              }
+              ravno
+            >
               <div className="border-b border-line px-4">
                 <Prekidac
                   ukljucen={nalog.sviSektori}
@@ -206,15 +232,26 @@ export function Nalozi() {
                 />
               </div>
               {!nalog.sviSektori && (
-                <ul className="divide-y divide-line">
-                  {baza.sektori.map((s) => {
+                <>
+                  {baza.sektori.length > 6 && (
+                    <div className="border-b border-line p-2">
+                      <Pretraga
+                        value={pretragaSektora}
+                        onChange={setPretragaSektora}
+                        placeholder="Pronađi sektor…"
+                        sirina="w-full"
+                      />
+                    </div>
+                  )}
+                  <ul className="divide-y divide-line">
+                  {sektoriZaDodelu.map((s) => {
                     const pokriva = (nalog.sektori ?? []).includes(s.id);
                     return (
                       <li key={s.id} className="flex items-center gap-3 px-4 py-2">
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm">{s.naziv}</span>
                           <span className="block truncate font-mono text-eyebrow text-ink-faint">
-                            {s.sifra} · {baza.zaposleni.filter((z) => z.sektorId === s.id).length} zaposlenih
+                            {s.sifra} · {brojPoSektoru.get(s.id) ?? 0} zaposlenih
                           </span>
                         </span>
                         <input
@@ -235,7 +272,11 @@ export function Nalozi() {
                       </li>
                     );
                   })}
-                </ul>
+                  </ul>
+                  {sektoriZaDodelu.length === 0 && (
+                    <p className="px-4 py-3 text-micro text-ink-muted">Nema sektora po ovom pojmu.</p>
+                  )}
+                </>
               )}
               {bezNadleznosti(nalog) && (
                 <p className="border-t border-line px-4 py-2.5 text-micro text-signal-danger">

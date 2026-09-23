@@ -2,11 +2,14 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FilePlus2, Mail, Pencil, Printer } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { nadjiNalog, nadjiOpremu, nazivSektora, punoIme, rokZaduzenja, vidljiviZaposleni } from '../lib/izbor';
-import { danaDo, datum, datumVreme, sadrzi, useSada } from '../lib/format';
+import {
+  brojAktivnihZaduzenja, nadjiNalog, nadjiOpremu, nazivSektora, poPrezimenu, punoIme,
+  rokZaduzenja, traziZaposlenog, vidljiviZaposleni,
+} from '../lib/izbor';
+import { danaDo, datum, datumVreme, useSada } from '../lib/format';
 import type { Karton, Zaposleni } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
-import { Modal, Oznaka, Polje, Prazno, Pretraga, useToast } from '../components/ui';
+import { Filteri, Modal, Oznaka, Polje, Prazno, Pretraga, useToast, useVise, Vise } from '../components/ui';
 import { NAZIV_ROKA, TON_ROKA } from '../components/Rok';
 import { PotpisPad } from '../components/Potpis';
 
@@ -26,21 +29,24 @@ export function Kartoni() {
   const sada = useSada(1000);
   const [params, setParams] = useSearchParams();
   const [pretraga, setPretraga] = useState('');
+  const [filter, setFilter] = useState<'svi' | 'sa' | 'bez'>('svi');
   const [izmena, setIzmena] = useState<Zaposleni | null>(null);
   const [otvaranje, setOtvaranje] = useState<Zaposleni | null>(null);
+
+  /** Ko već ima karton — jednim prolazom, jer spisak ide na stotine imena. */
+  const saKartonom = useMemo(() => new Set(baza.kartoni.map((k) => k.zaposleniId)), [baza.kartoni]);
+  const brojAktivnih = useMemo(() => brojAktivnihZaduzenja(baza), [baza]);
 
   // Kartoni se vide samo za zaposlene iz sektora u nadležnosti naloga.
   const lista = useMemo(
     () =>
-      vidljiviZaposleni(baza, ja).filter(
-        (z) =>
-          !pretraga ||
-          sadrzi(punoIme(z), pretraga) ||
-          sadrzi(z.radnoMesto, pretraga) ||
-          sadrzi(nazivSektora(baza, z.sektorId), pretraga),
-      ),
-    [baza, ja, pretraga],
+      vidljiviZaposleni(baza, ja)
+        .filter((z) => (filter === 'sa' ? saKartonom.has(z.id) : filter === 'bez' ? !saKartonom.has(z.id) : true))
+        .filter((z) => traziZaposlenog(baza, z, pretraga))
+        .sort(poPrezimenu),
+    [baza, ja, pretraga, filter, saKartonom],
   );
+  const { deo, ostalo, jos, korak } = useVise(lista, 40);
 
   const izabranId = params.get('z') ?? lista[0]?.id ?? '';
   const zaposleni = baza.zaposleni.find((z) => z.id === izabranId);
@@ -103,13 +109,21 @@ export function Kartoni() {
 
       <div className="grid items-start gap-5 2xl:grid-cols-[13.5rem_minmax(0,1fr)]">
         <aside className="no-print panel overflow-hidden">
-          <div className="border-b border-line p-2">
-            <Pretraga value={pretraga} onChange={setPretraga} placeholder="Zaposleni…" sirina="w-full" />
+          <div className="space-y-2 border-b border-line p-2">
+            <Pretraga value={pretraga} onChange={setPretraga} placeholder="Ime, sektor, radno mesto…" sirina="w-full" />
+            <Filteri
+              vrednost={filter}
+              onChange={setFilter}
+              stavke={[['svi', 'Svi'], ['sa', 'Sa kartonom'], ['bez', 'Bez kartona']] as const}
+            />
+            <div className="px-0.5 font-mono text-eyebrow text-ink-faint tnum">
+              {lista.length} zaposlenih
+            </div>
           </div>
           <ul className="max-h-56 divide-y divide-line overflow-y-auto 2xl:max-h-[70vh]">
-            {lista.map((z) => {
-              const imaKarton = baza.kartoni.some((k) => k.zaposleniId === z.id);
-              const broj = baza.zaduzenja.filter((x) => x.zaposleniId === z.id && x.status === 'aktivno').length;
+            {deo.map((z) => {
+              const imaKarton = saKartonom.has(z.id);
+              const broj = brojAktivnih.get(z.id) ?? 0;
               return (
                 <li key={z.id}>
                   <button
@@ -131,7 +145,11 @@ export function Kartoni() {
                 </li>
               );
             })}
+            {lista.length === 0 && (
+              <li className="px-3 py-4 text-micro text-ink-muted">Nema zaposlenog po ovim uslovima.</li>
+            )}
           </ul>
+          <Vise ostalo={ostalo} korak={korak} onVise={jos} />
         </aside>
 
         {!zaposleni ? (

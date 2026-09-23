@@ -2,7 +2,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Check, AlertTriangle, Info } from 'lucide-react';
+import { X, Search, Check, AlertTriangle, Info, ChevronDown } from 'lucide-react';
 
 /**
  * Sve što lebdi iznad strane ide direktno na `<body>`.
@@ -188,23 +188,76 @@ export function Polje({
 }
 
 export function Pretraga({
-  value, onChange, placeholder = 'Pretraga…', sirina = 'w-full sm:w-72',
+  value, onChange, placeholder = 'Pretraga…', sirina = 'w-full sm:w-72', autoFocus,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   sirina?: string;
+  autoFocus?: boolean;
 }) {
   return (
     <div className={`relative ${sirina}`}>
       <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
       <input
-        className="input pl-8"
+        className={`input pl-8 ${value ? 'pr-8' : ''}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && value && (e.stopPropagation(), onChange(''))}
         placeholder={placeholder}
+        autoFocus={autoFocus}
       />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label="Obriši pretragu"
+          className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-card text-ink-faint hover:bg-surface-deep hover:text-ink"
+        >
+          <X size={13} />
+        </button>
+      )}
     </div>
+  );
+}
+
+/* --------------------------- Duge liste --------------------------- */
+
+/**
+ * Liste sa hiljadu redova se ne crtaju odjednom — prikazuje se prvi deo, pa
+ * `Vise` dodaje sledeći. Prikaz se vraća na početak čim se lista promeni
+ * (druga pretraga, drugi filter), da korisnik ne ostane „duboko" u tuđem spisku.
+ */
+export function useVise<T>(lista: T[], korak = 50) {
+  const [koliko, setKoliko] = useState(korak);
+  const kljuc = lista.length;
+  const [prethodni, setPrethodni] = useState(kljuc);
+  if (prethodni !== kljuc) {
+    setPrethodni(kljuc);
+    setKoliko(korak);
+  }
+  const deo = useMemo(() => lista.slice(0, koliko), [lista, koliko]);
+  return {
+    deo,
+    ostalo: Math.max(0, lista.length - deo.length),
+    jos: () => setKoliko((k) => k + korak),
+    korak,
+  };
+}
+
+/** Dugme „prikaži još" ispod duge liste. Ništa ne crta kad nema ostatka. */
+export function Vise({ ostalo, korak, onVise }: { ostalo: number; korak: number; onVise: () => void }) {
+  if (ostalo === 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onVise}
+      className="flex w-full items-center justify-center gap-1.5 border-t border-line bg-surface px-4 py-2.5 text-micro font-medium text-ink-muted transition-colors hover:bg-surface-deep hover:text-ink"
+    >
+      <ChevronDown size={13} />
+      Prikaži još {Math.min(korak, ostalo)}
+      <span className="font-mono text-ink-faint tnum">· preostalo {ostalo}</span>
+    </button>
   );
 }
 

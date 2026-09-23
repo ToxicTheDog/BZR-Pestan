@@ -6,6 +6,7 @@ import { uNadleznosti } from '../prava.js';
 import { async_, losZahtev, nijeNadjeno, sukob, zabranjeno } from '../greske.js';
 import { imaPravo } from '../prava.js';
 import { broj, izbor, logicki, spoji, tekst } from '../provera.js';
+import { odgovara } from '../pretraga.js';
 import { upisiLog } from '../dnevnik.js';
 
 const STANJA = ['slobodno', 'zaduzeno', 'servis', 'rezervisano', 'otpisano'];
@@ -89,9 +90,33 @@ sektori.delete('/:id', trazenoPravo('sektori.upravljaj'), async_((req, res) => {
 export const zaposleni = Router();
 zaposleni.use(trazenaPrijava);
 
-// Vide se samo zaposleni iz sektora u nadležnosti naloga.
+/*
+ * Vide se samo zaposleni iz sektora u nadležnosti naloga.
+ *
+ * Evidencija ide na stotine imena, pa spisak podržava pretragu (`?q=`),
+ * sektor (`?sektor=`) i straničenje (`?limit=&offset=`). Odgovor uvek nosi
+ * ukupan broj pogodaka, da klijent zna ima li još.
+ */
 zaposleni.get('/', trazenoPravo('zaposleni.vidi'), async_((req, res) => {
-  res.json({ stavke: baza().zaposleni.filter((z) => uNadleznosti(req.nalog, z.sektorId)) });
+  const b = baza();
+  const { q = '', sektor = '' } = req.query;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 0, 0), 500);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  const nadjeni = b.zaposleni
+    .filter((z) => uNadleznosti(req.nalog, z.sektorId))
+    .filter((z) => !sektor || z.sektorId === sektor)
+    .filter((z) => {
+      const s = b.sektori.find((x) => x.id === z.sektorId);
+      return odgovara(
+        [z.ime, z.prezime, `${z.ime} ${z.prezime}`, z.radnoMesto, z.lokacija, z.email, z.telefon, s?.naziv, s?.sifra],
+        q,
+      );
+    })
+    .sort((a, c) => `${a.prezime} ${a.ime}`.localeCompare(`${c.prezime} ${c.ime}`, 'sr'));
+
+  const deo = limit ? nadjeni.slice(offset, offset + limit) : nadjeni.slice(offset);
+  res.json({ stavke: deo, ukupno: nadjeni.length });
 }));
 
 function poljaZaposlenog(telo, obavezno) {

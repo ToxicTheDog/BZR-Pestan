@@ -39,6 +39,7 @@ naloga, gde je izuzetak jači (`src/prava.js`).
 | PATCH/DELETE | `/api/nalozi/:id` | `nalozi.upravljaj` |
 | PUT | `/api/nalozi/:id/pravo` | `nalozi.upravljaj` |
 | GET | `/api/zaposleni` | `zaposleni.vidi` |
+| | *(`?q=` pretraga, `?sektor=`, `?limit=&offset=`; odgovor nosi i `ukupno`)* | |
 | POST/PATCH | `/api/zaposleni` | `zaposleni.upis` |
 | GET | `/api/kategorije` | `inventar.vidi` |
 | POST/PATCH/DELETE | `/api/kategorije` | `inventar.upis` |
