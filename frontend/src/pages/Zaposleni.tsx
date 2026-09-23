@@ -2,11 +2,17 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClipboardList, Plus } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { nazivSektora, punoIme, rokZaduzenja, vidljivaZaduzenja, vidljiviZaposleni } from '../lib/izbor';
-import { danaDo, datum, sadrzi, useSada } from '../lib/format';
+import {
+  brojAktivnihZaduzenja, nazivSektora, poPrezimenu, punoIme, rokZaduzenja, slovoZaposlenog,
+  traziZaposlenog, vidljivaZaduzenja, vidljiviZaposleni,
+} from '../lib/izbor';
+import { danaDo, datum, useSada } from '../lib/format';
 import type { Zaposleni as TZaposleni } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
-import { Brojac, Fioka, Modal, Odeljak, Oznaka, Podatak, Polje, Prazno, Pretraga, useToast } from '../components/ui';
+import {
+  Brojac, Filteri, Fioka, Modal, Odeljak, Oznaka, Podatak, Polje, Prazno, Pretraga, useToast,
+  useVise, Vise,
+} from '../components/ui';
 import { RokOznaka } from '../components/Rok';
 
 const prazan: Omit<TZaposleni, 'id'> = {
@@ -15,25 +21,70 @@ const prazan: Omit<TZaposleni, 'id'> = {
   aktivan: true, lekarskiVazi: null, obukaBzrVazi: null,
 };
 
+type Filter = 'svi' | 'zaduzeni' | 'rokovi' | 'neaktivni';
+
+const FILTERI = [
+  ['svi', 'Svi'],
+  ['zaduzeni', 'Sa zaduženjem'],
+  ['rokovi', 'Rokovi ističu'],
+  ['neaktivni', 'Neaktivni'],
+] as const;
+
+/** Lekarski ili obuka BZR koji je istekao ili ističe u narednih mesec dana. */
+function rokPri(z: TZaposleni): boolean {
+  return [z.lekarskiVazi, z.obukaBzrVazi].some((iso) => {
+    const d = danaDo(iso);
+    return d !== null && d <= 30;
+  });
+}
+
 export function Zaposleni() {
   const { baza, akcije, ja, smem } = useStore();
   const javi = useToast();
   const sada = useSada(1000);
   const [pretraga, setPretraga] = useState('');
+  const [sektorId, setSektorId] = useState('svi');
+  const [filter, setFilter] = useState<Filter>('svi');
+  const [slovo, setSlovo] = useState<string | null>(null);
   const [detalj, setDetalj] = useState<TZaposleni | null>(null);
   const [forma, setForma] = useState<Omit<TZaposleni, 'id'> | null>(null);
 
   // Vide se samo zaposleni iz sektora u nadležnosti naloga.
-  const lista = useMemo(
+  const svi = useMemo(() => vidljiviZaposleni(baza, ja), [baza, ja]);
+  const aktivnaZaduzenja = useMemo(() => brojAktivnihZaduzenja(baza), [baza]);
+
+  /* Pretraga i filteri idu pre azbučnika — slova se računaju nad onim što je
+     ostalo, pa nikad ne ponudimo slovo koje daje prazan spisak. */
+  const nadjeni = useMemo(
     () =>
-      vidljiviZaposleni(baza, ja).filter(
-        (z) =>
-          !pretraga ||
-          sadrzi(punoIme(z), pretraga) ||
-          sadrzi(z.radnoMesto, pretraga) ||
-          sadrzi(nazivSektora(baza, z.sektorId), pretraga),
-      ),
-    [baza, ja, pretraga],
+      svi
+        .filter((z) => sektorId === 'svi' || z.sektorId === sektorId)
+        .filter((z) => {
+          if (filter === 'zaduzeni') return (aktivnaZaduzenja.get(z.id) ?? 0) > 0;
+          if (filter === 'rokovi') return rokPri(z);
+          if (filter === 'neaktivni') return !z.aktivan;
+          return true;
+        })
+        .filter((z) => traziZaposlenog(baza, z, pretraga))
+        .sort(poPrezimenu),
+    [svi, baza, sektorId, filter, pretraga, aktivnaZaduzenja],
+  );
+
+  const slova = useMemo(() => {
+    const skup = new Map<string, number>();
+    for (const z of nadjeni) skup.set(slovoZaposlenog(z), (skup.get(slovoZaposlenog(z)) ?? 0) + 1);
+    return Array.from(skup.entries()).sort((a, b) => a[0].localeCompare(b[0], 'sr'));
+  }, [nadjeni]);
+
+  const lista = useMemo(
+    () => (slovo ? nadjeni.filter((z) => slovoZaposlenog(z) === slovo) : nadjeni),
+    [nadjeni, slovo],
+  );
+  const { deo, ostalo, jos, korak } = useVise(lista, 50);
+
+  const sektoriUListi = useMemo(
+    () => baza.sektori.filter((s) => svi.some((z) => z.sektorId === s.id)),
+    [baza.sektori, svi],
   );
 
   return (
@@ -42,6 +93,13 @@ export function Zaposleni() {
         nadnaslov="Evidencija"
         naslov="Zaposleni"
         opis="Podaci koji ulaze u karton: radno mesto, veličine, lekarski pregled i obuka BZR."
+        meta={
+          <>
+            <Metrika label="U nadležnosti" vrednost={svi.length} />
+            <Metrika label="Sa zaduženjem" vrednost={svi.filter((z) => (aktivnaZaduzenja.get(z.id) ?? 0) > 0).length} />
+            <Metrika label="Rokovi ističu" vrednost={svi.filter(rokPri).length} ton="warn" />
+          </>
+        }
         akcije={
           smem('zaposleni.upis') && (
             <button className="btn-accent" onClick={() => setForma(prazan)}>
@@ -52,35 +110,96 @@ export function Zaposleni() {
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Pretraga value={pretraga} onChange={setPretraga} placeholder="Ime, radno mesto, služba…" />
+        <Pretraga
+          value={pretraga}
+          onChange={(v) => {
+            setPretraga(v);
+            setSlovo(null);
+          }}
+          placeholder="Ime, prezime, radno mesto, sektor, e-pošta…"
+          sirina="w-full sm:w-80"
+        />
+        <select
+          className="input w-auto py-1.5 text-micro"
+          value={sektorId}
+          onChange={(e) => {
+            setSektorId(e.target.value);
+            setSlovo(null);
+          }}
+          aria-label="Sektor"
+        >
+          <option value="svi">Svi sektori</option>
+          {sektoriUListi.map((s) => (
+            <option key={s.id} value={s.id}>{s.naziv}</option>
+          ))}
+        </select>
+        <Filteri
+          vrednost={filter}
+          onChange={(v) => {
+            setFilter(v);
+            setSlovo(null);
+          }}
+          stavke={FILTERI}
+        />
         <span className="ml-auto">
-          <Brojac prikazano={lista.length} ukupno={baza.zaposleni.length} jedinica="zaposlenih" />
+          <Brojac prikazano={lista.length} ukupno={svi.length} jedinica="zaposlenih" />
         </span>
       </div>
 
+      {/* Azbučnik: na spisku od šest stotina imena skok na slovo je brži od skrola. */}
+      {slova.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-0.5">
+          <button
+            onClick={() => setSlovo(null)}
+            className={`slovo w-auto px-2.5 font-sans ${
+              slovo === null ? 'bg-ink text-paper' : 'text-ink-muted hover:bg-surface'
+            }`}
+          >
+            Sva slova
+          </button>
+          {slova.map(([s, broj]) => (
+            <button
+              key={s}
+              onClick={() => setSlovo(slovo === s ? null : s)}
+              title={`${broj} zaposlenih`}
+              className={`slovo ${slovo === s ? 'bg-ink text-paper' : 'text-ink-muted hover:bg-surface'}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="panel overflow-hidden">
         {lista.length === 0 ? (
-          <Prazno naslov="Nema zaposlenih po ovom pojmu" />
+          <Prazno
+            naslov="Nema zaposlenog po ovim uslovima"
+            hint="Proverite pojam pretrage, izabrani sektor i filter — traži se samo u sektorima u vašoj nadležnosti."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead className="bg-surface">
-                <tr>
-                  <th className="th">Ime i prezime</th>
-                  <th className="th">Radno mesto</th>
-                  <th className="th w-40">Sektor</th>
-                  <th className="th w-24">Obuća / konf.</th>
-                  <th className="th w-28">Lekarski</th>
-                  <th className="th w-28">Obuka BZR</th>
-                  <th className="th w-24 text-right">Zaduženja</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lista.map((z) => {
-                  const aktivna = baza.zaduzenja.filter((x) => x.zaposleniId === z.id && x.status === 'aktivno');
-                  return (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px]">
+                <thead className="bg-surface">
+                  <tr>
+                    <th className="th">Ime i prezime</th>
+                    <th className="th">Radno mesto</th>
+                    <th className="th w-40">Sektor</th>
+                    <th className="th w-24">Obuća / konf.</th>
+                    <th className="th w-28">Lekarski</th>
+                    <th className="th w-28">Obuka BZR</th>
+                    <th className="th w-24 text-right">Zaduženja</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deo.map((z) => (
                     <tr key={z.id} className="row cursor-pointer" onClick={() => setDetalj(z)}>
-                      <td className="td font-medium">{punoIme(z)}</td>
+                      <td className="td font-medium">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate">{punoIme(z)}</span>
+                          {!z.aktivan && <Oznaka ton="neutral">neaktivan</Oznaka>}
+                        </span>
+                      </td>
                       <td className="td text-micro">{z.radnoMesto}</td>
                       <td className="td text-micro">{nazivSektora(baza, z.sektorId)}</td>
                       <td className="td font-mono text-micro tnum">
@@ -88,13 +207,14 @@ export function Zaposleni() {
                       </td>
                       <td className="td"><RokPolje iso={z.lekarskiVazi} /></td>
                       <td className="td"><RokPolje iso={z.obukaBzrVazi} /></td>
-                      <td className="td text-right font-mono text-sm tnum">{aktivna.length}</td>
+                      <td className="td text-right font-mono text-sm tnum">{aktivnaZaduzenja.get(z.id) ?? 0}</td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Vise ostalo={ostalo} korak={korak} onVise={jos} />
+          </>
         )}
       </div>
 
@@ -208,6 +328,21 @@ export function Zaposleni() {
         )}
       </Modal>
     </>
+  );
+}
+
+function Metrika({ label, vrednost, ton }: { label: string; vrednost: number; ton?: 'warn' }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span
+        className={`font-mono text-lg font-semibold tnum ${
+          vrednost === 0 ? 'text-ink-faint' : ton === 'warn' ? 'text-signal-warn' : ''
+        }`}
+      >
+        {vrednost}
+      </span>
+      <span className="eyebrow">{label}</span>
+    </div>
   );
 }
 

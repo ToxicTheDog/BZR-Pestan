@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Minus, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { kategorijaOpreme, nazivSektora, punoIme, vaziRok, vidljiviZaposleni } from '../lib/izbor';
+import {
+  kategorijaOpreme, nazivSektora, poPrezimenu, punoIme, traziZaposlenog, vaziRok, vidljiviZaposleni,
+} from '../lib/izbor';
 import { danaRec, datum, sadrzi } from '../lib/format';
 import type { Oprema, StavkaZaduzenja, Zaduzenje } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
-import { Odeljak, Oznaka, Polje, Prazno, Prekidac, Pretraga, useToast } from '../components/ui';
+import { Odeljak, Oznaka, Polje, Prazno, Prekidac, Pretraga, useToast, useVise, Vise } from '../components/ui';
 import { DijalogPotpisa } from '../components/Dijalozi';
 
 export function NovoZaduzenje() {
@@ -29,16 +31,13 @@ export function NovoZaduzenje() {
   // Oprema se izdaje samo zaposlenom iz sektora koji nalog pokriva.
   const listaZaposlenih = useMemo(
     () =>
-      vidljiviZaposleni(baza, ja).filter(
-        (z) =>
-          z.aktivan &&
-          (!pretragaZap ||
-            sadrzi(punoIme(z), pretragaZap) ||
-            sadrzi(z.radnoMesto, pretragaZap) ||
-            sadrzi(nazivSektora(baza, z.sektorId), pretragaZap)),
-      ),
+      vidljiviZaposleni(baza, ja)
+        .filter((z) => z.aktivan && traziZaposlenog(baza, z, pretragaZap))
+        .sort(poPrezimenu),
     [baza, ja, pretragaZap],
   );
+  // Spisak zaposlenih je predugačak da bi se crtao ceo — traži se, pa dopunjuje.
+  const zapDeo = useVise(listaZaposlenih, 25);
 
   const dostupna = useMemo(
     () =>
@@ -131,11 +130,23 @@ export function NovoZaduzenje() {
             naslov="Zaposleni"
             nadnaslov="Korak 1"
             ravno
-            akcije={<Pretraga value={pretragaZap} onChange={setPretragaZap} placeholder="Ime, radno mesto…" sirina="w-56" />}
+            akcije={
+              <>
+                <span className="font-mono text-eyebrow text-ink-faint tnum">
+                  {listaZaposlenih.length} zaposlenih
+                </span>
+                <Pretraga
+                  value={pretragaZap}
+                  onChange={setPretragaZap}
+                  placeholder="Ime, radno mesto, sektor…"
+                  sirina="w-56"
+                />
+              </>
+            }
           >
             <div className="max-h-64 overflow-y-auto">
               <ul className="divide-y divide-line">
-                {listaZaposlenih.map((z) => (
+                {zapDeo.deo.map((z) => (
                   <li key={z.id}>
                     <button
                       onClick={() => setZaposleniId(z.id)}
@@ -157,7 +168,13 @@ export function NovoZaduzenje() {
                     </button>
                   </li>
                 ))}
+                {listaZaposlenih.length === 0 && (
+                  <li className="px-4 py-4 text-micro text-ink-muted">
+                    Nema zaposlenog po ovom pojmu — traži se samo u sektorima u vašoj nadležnosti.
+                  </li>
+                )}
               </ul>
+              <Vise ostalo={zapDeo.ostalo} korak={zapDeo.korak} onVise={zapDeo.jos} />
             </div>
           </Odeljak>
 

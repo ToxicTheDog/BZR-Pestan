@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Send } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { punoIme, vidljivaPosta, vidljiviZaposleni } from '../lib/izbor';
+import { poPrezimenu, punoIme, traziZaposlenog, vidljivaPosta, vidljiviZaposleni } from '../lib/izbor';
 import { datumVreme, relativno, sadrzi } from '../lib/format';
 import type { Mail, StatusMaila } from '../lib/types';
 import { Zaglavlje, SaDosijeom } from '../components/Shell';
@@ -199,11 +199,22 @@ function NovaPoruka({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { baza, akcije, ja } = useStore();
   const javi = useToast();
   const [primalac, setPrimalac] = useState('');
+  const [pretragaPrimaoca, setPretragaPrimaoca] = useState('');
   const [sablonId, setSablonId] = useState('');
   const [tema, setTema] = useState('');
   const [telo, setTelo] = useState('');
 
   const zaposleni = baza.zaposleni.find((z) => z.id === primalac);
+
+  /* Padajuća lista sa šest stotina imena je neupotrebljiva, pa se skraćuje
+     pretragom; već izabrani primalac ostaje u spisku i kad pojam ne odgovara. */
+  const primaoci = useMemo(
+    () =>
+      vidljiviZaposleni(baza, ja)
+        .filter((z) => z.id === primalac || traziZaposlenog(baza, z, pretragaPrimaoca))
+        .sort(poPrezimenu),
+    [baza, ja, pretragaPrimaoca, primalac],
+  );
 
   function primeniSablon(id: string) {
     setSablonId(id);
@@ -253,13 +264,23 @@ function NovaPoruka({ open, onClose }: { open: boolean; onClose: () => void }) {
     >
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Polje label="Primalac">
-            <select className="input" value={primalac} onChange={(e) => setPrimalac(e.target.value)}>
-              <option value="">— izaberite zaposlenog —</option>
-              {vidljiviZaposleni(baza, ja).map((z) => (
-                <option key={z.id} value={z.id}>{punoIme(z)}</option>
-              ))}
-            </select>
+          <Polje label="Primalac" hint={`${primaoci.length} zaposlenih u izboru`}>
+            <div className="space-y-2">
+              <Pretraga
+                value={pretragaPrimaoca}
+                onChange={setPretragaPrimaoca}
+                placeholder="Pronađi zaposlenog…"
+                sirina="w-full"
+              />
+              <select className="input" value={primalac} onChange={(e) => setPrimalac(e.target.value)}>
+                <option value="">— izaberite zaposlenog —</option>
+                {primaoci.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {punoIme(z)} — {z.radnoMesto}
+                  </option>
+                ))}
+              </select>
+            </div>
           </Polje>
           <Polje label="Šablon">
             <select className="input" value={sablonId} onChange={(e) => primeniSablon(e.target.value)}>

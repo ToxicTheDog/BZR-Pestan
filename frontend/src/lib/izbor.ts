@@ -1,5 +1,5 @@
 import type { Baza, Kontrola, Nalog, Oprema, Sektor, Zaduzenje, Zaposleni } from './types';
-import { procitajRok, type Rok, danaDo } from './format';
+import { procitajRok, type Rok, danaDo, sadrzi } from './format';
 import { imaPravo } from './permissions';
 
 /* ------------------------- Nadležnost po sektorima -------------------------
@@ -91,6 +91,52 @@ export function vidljivaPosta(baza: Baza, nalog: Nalog | null) {
 
 export function punoIme(z: Zaposleni | undefined | null): string {
   return z ? `${z.ime} ${z.prezime}` : '—';
+}
+
+/* ---------------------- Pretraga i redosled spiska ----------------------
+ *
+ * Spisak zaposlenih je najveći u portalu (preko 600 imena), pa se pretraga
+ * drži na jednom mestu: sve strane traže po istim poljima i isti pojam svuda
+ * daje isti rezultat. Pismo i kvačice ne utiču — to rešava `sadrzi`.
+ */
+
+export function traziZaposlenog(baza: Baza, z: Zaposleni, upit: string): boolean {
+  if (!upit.trim()) return true;
+  const sektor = nadjiSektor(baza, z.sektorId);
+  // Više reči = svaka mora da se nađe ("milos ekstr" pronalazi Miloša iz ekstruzije).
+  return upit
+    .trim()
+    .split(/\s+/)
+    .every((rec) =>
+      sadrzi(punoIme(z), rec) ||
+      sadrzi(`${z.prezime} ${z.ime}`, rec) ||
+      sadrzi(z.radnoMesto, rec) ||
+      sadrzi(z.lokacija, rec) ||
+      sadrzi(z.email, rec) ||
+      sadrzi(z.telefon, rec) ||
+      sadrzi(sektor?.naziv, rec) ||
+      sadrzi(sektor?.sifra, rec),
+    );
+}
+
+/** Spisak po prezimenu — jedini redosled u kojem se ime nađe „na oko". */
+export function poPrezimenu(a: Zaposleni, b: Zaposleni): number {
+  return `${a.prezime} ${a.ime}`.localeCompare(`${b.prezime} ${b.ime}`, 'sr');
+}
+
+/** Prvo slovo prezimena — za azbučnik iznad spiska. */
+export function slovoZaposlenog(z: Zaposleni): string {
+  return (z.prezime.trim()[0] ?? '—').toLocaleUpperCase('sr');
+}
+
+/** Broj aktivnih zaduženja po zaposlenom — jedan prolaz umesto filtera u svakom redu. */
+export function brojAktivnihZaduzenja(baza: Baza): Map<string, number> {
+  const mapa = new Map<string, number>();
+  for (const z of baza.zaduzenja) {
+    if (z.status !== 'aktivno') continue;
+    mapa.set(z.zaposleniId, (mapa.get(z.zaposleniId) ?? 0) + 1);
+  }
+  return mapa;
 }
 
 export function nadjiZaposlenog(baza: Baza, id: string) {

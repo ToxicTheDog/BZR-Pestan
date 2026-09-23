@@ -107,7 +107,7 @@ const zaposleniRed: Z[] = [
 
 const idSektora = (naziv: string) => sektori.find((s) => s.naziv === naziv)?.id ?? sektori[0].id;
 
-const zaposleni: Zaposleni[] = zaposleniRed.map((r, i) => ({
+const nazvani: Zaposleni[] = zaposleniRed.map((r, i) => ({
   id: `z${i + 1}`,
   ime: r[0],
   prezime: r[1] === 'Ристić' ? 'Ristić' : r[1],
@@ -123,6 +123,116 @@ const zaposleni: Zaposleni[] = zaposleniRed.map((r, i) => ({
   lekarskiVazi: za(r[7]),
   obukaBzrVazi: za(r[8]),
 }));
+
+/* ------------------- Ostatak pogona (demo popuna) -------------------
+ *
+ * Firma ima preko 600 zaposlenih, pa demo mora da radi na tom broju —
+ * pretraga, filteri i straničenje se inače „lepo" ponašaju na 14 redova, a
+ * pucaju na pravom spisku. Spisak je izveden iz indeksa (bez `Math.random`),
+ * da se isti demo dobije pri svakom otvaranju. */
+
+const IMENA_M = [
+  'Miloš', 'Nikola', 'Stefan', 'Marko', 'Aleksandar', 'Nenad', 'Bojan', 'Filip', 'Zoran',
+  'Dejan', 'Vladan', 'Goran', 'Miroslav', 'Predrag', 'Saša', 'Ivan', 'Igor', 'Đorđe',
+  'Vuk', 'Lazar', 'Uroš', 'Petar', 'Branko', 'Slaviša', 'Milan', 'Dušan', 'Nemanja',
+];
+const IMENA_Z = [
+  'Jovana', 'Ivana', 'Danijela', 'Sanja', 'Katarina', 'Tijana', 'Milica', 'Jelena',
+  'Aleksandra', 'Nevena', 'Marina', 'Snežana', 'Ljiljana', 'Biljana', 'Dragana',
+  'Anđela', 'Teodora', 'Vesna', 'Maja', 'Tamara', 'Nataša', 'Bojana', 'Slađana',
+];
+const PREZIMENA = [
+  'Jovanović', 'Petrović', 'Nikolić', 'Marković', 'Đorđević', 'Stojanović', 'Ilić',
+  'Stanković', 'Pavlović', 'Milošević', 'Todorović', 'Ristić', 'Jeremić', 'Kostić',
+  'Lukić', 'Simić', 'Vasić', 'Mitrović', 'Antić', 'Janković', 'Radovanović', 'Živković',
+  'Milenković', 'Savić', 'Popović', 'Obradović', 'Radić', 'Cvetković', 'Krstić',
+  'Blagojević', 'Aleksić', 'Vučković', 'Tomić', 'Gajić', 'Đukić', 'Nedeljković',
+  'Bogdanović', 'Vukašinović', 'Rakić', 'Erić', 'Milovanović', 'Perić', 'Damjanović',
+  'Zdravković', 'Miletić', 'Stevanović', 'Arsić', 'Veljković', 'Rajković', 'Novaković',
+];
+
+/** Radna mesta i pogoni po sektoru — da spisak liči na pravu proizvodnju. */
+const POSAO: Record<string, { mesta: string[]; lokacije: string[] }> = {
+  s1: {
+    mesta: ['Operater ekstrudera', 'Pomoćni radnik na liniji', 'Pakerka', 'Rukovalac linije', 'Vođa smene'],
+    lokacije: ['Hala 1', 'Hala 1 — linija 2', 'Hala 1 — linija 3'],
+  },
+  s2: {
+    mesta: ['Operater brizgalice', 'Monter fitinga', 'Kontrolor na liniji', 'Rukovodilac smene', 'Pomoćni radnik'],
+    lokacije: ['Hala 3', 'Hala 3 — montaža', 'Hala 4'],
+  },
+  s3: {
+    mesta: ['Alatničar', 'Operater CNC', 'Brusač', 'Konstruktor alata'],
+    lokacije: ['Alatnica', 'Alatnica — CNC'],
+  },
+  s4: {
+    mesta: ['Bravar održavanja', 'Elektroinstalater', 'Automatičar', 'Mehaničar', 'Vodoinstalater'],
+    lokacije: ['Hala 1', 'Hala 2', 'Radionica održavanja'],
+  },
+  s5: {
+    mesta: ['Magacioner', 'Viljuškarista', 'Referent prijema', 'Komisionar'],
+    lokacije: ['Magacin A', 'Magacin B', 'Otprema'],
+  },
+  s6: {
+    mesta: ['Kontrolor kvaliteta', 'Laborant', 'Tehnolog', 'Referent reklamacija'],
+    lokacije: ['Laboratorija', 'Hala 2 — kontrola'],
+  },
+  s7: {
+    mesta: ['Vozač kamiona', 'Vozač dostavnog vozila', 'Dispečer', 'Automehaničar'],
+    lokacije: ['Portirnica', 'Vozni park'],
+  },
+  s8: {
+    mesta: ['Referent nabavke', 'Samostalni nabavljač', 'Administrator ugovora'],
+    lokacije: ['Uprava'],
+  },
+};
+
+const CIPELE_M = ['41', '42', '43', '44', '45', '46', '47'];
+const CIPELE_Z = ['36', '37', '38', '39', '40', '41'];
+const KONFEKCIJA_M = ['M', 'L', 'XL', 'XXL', 'XXXL'];
+const KONFEKCIJA_Z = ['XS', 'S', 'M', 'L', 'XL'];
+
+/** Koliko ljudi ide u koji sektor — proizvodnja nosi najveći deo. */
+const RASPORED: [string, number][] = [
+  ['s1', 168], ['s2', 152], ['s3', 46], ['s4', 74], ['s5', 88], ['s6', 52], ['s7', 44], ['s8', 22],
+];
+
+const popuna: Zaposleni[] = [];
+let redniBroj = zaposleniRed.length;
+for (const [sektorId, koliko] of RASPORED) {
+  const posao = POSAO[sektorId];
+  for (let j = 0; j < koliko; j += 1) {
+    const i = redniBroj;
+    redniBroj += 1;
+    const zena = i % 3 === 1;
+    const ime = zena ? IMENA_Z[(i * 7) % IMENA_Z.length] : IMENA_M[(i * 5) % IMENA_M.length];
+    // Množilac uzajamno prost sa brojem prezimena — spisak prolazi kroz sva.
+    const prezime = PREZIMENA[(i * 17) % PREZIMENA.length];
+    const cir = String(i).padStart(4, '0');
+    popuna.push({
+      id: `z${i + 1}`,
+      ime,
+      prezime,
+      radnoMesto: posao.mesta[j % posao.mesta.length],
+      sektorId,
+      lokacija: posao.lokacije[j % posao.lokacije.length],
+      email: `${ime}.${prezime}`
+        .toLowerCase()
+        .replace(/đ/g, 'dj').replace(/š/g, 's').replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z')
+        + `.${cir}@pestan.rs`,
+      telefon: `06${(i % 6) + 2}/${100 + (i % 800)}-${String((i * 37) % 1000).padStart(3, '0')}`,
+      datumZaposlenja: pre(120 + ((i * 53) % 5200)),
+      brojCipela: zena ? CIPELE_Z[i % CIPELE_Z.length] : CIPELE_M[i % CIPELE_M.length],
+      konfekcija: zena ? KONFEKCIJA_Z[(i * 3) % KONFEKCIJA_Z.length] : KONFEKCIJA_M[(i * 3) % KONFEKCIJA_M.length],
+      // Svaki dvadeseti je van radnog odnosa — ostaje u evidenciji zbog kartona.
+      aktivan: i % 23 !== 0,
+      lekarskiVazi: za(((i * 29) % 420) - 30),
+      obukaBzrVazi: za(((i * 41) % 500) - 45),
+    });
+  }
+}
+
+const zaposleni: Zaposleni[] = [...nazvani, ...popuna];
 
 /* --------------------------- Kategorije --------------------------- */
 

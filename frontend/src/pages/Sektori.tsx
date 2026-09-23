@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { nadleznost, odobriociSektora, punoIme, uNadleznosti, usluziociSektora } from '../lib/izbor';
+import {
+  brojAktivnihZaduzenja, nadleznost, odobriociSektora, poPrezimenu, punoIme, traziZaposlenog,
+  uNadleznosti, usluziociSektora,
+} from '../lib/izbor';
 import { ULOGE, imaPravo } from '../lib/permissions';
-import { inicijali } from '../lib/format';
+import { inicijali, sadrzi } from '../lib/format';
 import type { Nalog, Sektor } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
-import { Fioka, Modal, Odeljak, Oznaka, Polje, Potvrda, Prazno, Prekidac, useToast } from '../components/ui';
+import {
+  Brojac, Filteri, Fioka, Modal, Odeljak, Oznaka, Polje, Potvrda, Prazno, Prekidac, Pretraga,
+  useToast, useVise, Vise,
+} from '../components/ui';
 
 const prazan = (): Omit<Sektor, 'id'> => ({ naziv: '', sifra: '', opis: '', aktivan: true });
 
@@ -21,8 +27,30 @@ export function Sektori() {
   const [forma, setForma] = useState<{ podaci: Omit<Sektor, 'id'>; id?: string } | null>(null);
   const [brisanje, setBrisanje] = useState<Sektor | null>(null);
   const [otvoren, setOtvoren] = useState<Sektor | null>(null);
+  const [pretraga, setPretraga] = useState('');
 
-  const brojZaposlenih = (id: string) => baza.zaposleni.filter((z) => z.sektorId === id).length;
+  /** Broj zaposlenih po sektoru u jednom prolazu — spisak ide na stotine imena. */
+  const brojPoSektoru = useMemo(() => {
+    const mapa = new Map<string, number>();
+    for (const z of baza.zaposleni) mapa.set(z.sektorId, (mapa.get(z.sektorId) ?? 0) + 1);
+    return mapa;
+  }, [baza.zaposleni]);
+  const brojZaposlenih = (id: string) => brojPoSektoru.get(id) ?? 0;
+
+  const lista = useMemo(
+    () =>
+      baza.sektori.filter(
+        (s) =>
+          !pretraga ||
+          sadrzi(s.naziv, pretraga) ||
+          sadrzi(s.sifra, pretraga) ||
+          sadrzi(s.opis, pretraga) ||
+          odobriociSektora(baza, s.id).some((n) => sadrzi(n.fullName, pretraga)) ||
+          usluziociSektora(baza, s.id).some((n) => sadrzi(n.fullName, pretraga)),
+      ),
+    [baza, pretraga],
+  );
+
   const sektor = otvoren ? baza.sektori.find((s) => s.id === otvoren.id) ?? null : null;
 
   return (
@@ -48,7 +76,17 @@ export function Sektori() {
         }
       />
 
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Pretraga value={pretraga} onChange={setPretraga} placeholder="Sektor, šifra ili nadležni nalog…" />
+        <span className="ml-auto">
+          <Brojac prikazano={lista.length} ukupno={baza.sektori.length} jedinica="sektora" />
+        </span>
+      </div>
+
       <div className="panel overflow-hidden">
+        {lista.length === 0 ? (
+          <Prazno naslov="Nema sektora po ovom pojmu" />
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[940px]">
             <thead className="bg-surface">
@@ -62,7 +100,7 @@ export function Sektori() {
               </tr>
             </thead>
             <tbody>
-              {baza.sektori.map((s) => {
+              {lista.map((s) => {
                 const odobrioci = odobriociSektora(baza, s.id);
                 const usluzioci = usluziociSektora(baza, s.id);
                 const zaposlenih = brojZaposlenih(s.id);
@@ -123,6 +161,7 @@ export function Sektori() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       <NadleznostSektora sektor={sektor} onClose={() => setOtvoren(null)} />
@@ -184,24 +223,72 @@ function Imena({ nalozi }: { nalozi: Nalog[] }) {
 function NadleznostSektora({ sektor, onClose }: { sektor: Sektor | null; onClose: () => void }) {
   const { baza, akcije } = useStore();
   const javi = useToast();
+  const [pretragaNaloga, setPretragaNaloga] = useState('');
+  const [filterNaloga, setFilterNaloga] = useState<'svi' | 'nadlezni' | 'ostali'>('svi');
+  const [pretragaZaposlenih, setPretragaZaposlenih] = useState('');
+
+  const sektorId = sektor?.id ?? '';
+
+  /* Kandidat je svaki nalog koji uopšte ima posla sa zaduženjima — njemu
+     dodela sektora nešto znači. Spisak se pretražuje po imenu, korisničkom
+     imenu i ulozi, jer nalogâ vremenom bude i preko stotinu. */
+  const kandidati = useMemo(
+    () =>
+      baza.nalozi.filter(
+        (n) =>
+          imaPravo(n, 'odobrenja.odlucuj', baza.pravaUloga) ||
+          imaPravo(n, 'zaduzenja.izdaj', baza.pravaUloga) ||
+          imaPravo(n, 'zaduzenja.vidi', baza.pravaUloga),
+      ),
+    [baza.nalozi, baza.pravaUloga],
+  );
+
+  const nalozi = useMemo(
+    () =>
+      kandidati
+        .filter((n) => {
+          const pokriva = uNadleznosti(nadleznost(n), sektorId);
+          if (filterNaloga === 'nadlezni') return pokriva;
+          if (filterNaloga === 'ostali') return !pokriva;
+          return true;
+        })
+        .filter(
+          (n) =>
+            !pretragaNaloga ||
+            sadrzi(n.fullName, pretragaNaloga) ||
+            sadrzi(n.username, pretragaNaloga) ||
+            sadrzi(n.email, pretragaNaloga) ||
+            sadrzi(ULOGE[n.role].naziv, pretragaNaloga),
+        ),
+    [kandidati, sektorId, filterNaloga, pretragaNaloga],
+  );
+
+  const zaposleni = useMemo(
+    () =>
+      baza.zaposleni
+        .filter((z) => z.sektorId === sektorId)
+        .filter((z) => traziZaposlenog(baza, z, pretragaZaposlenih))
+        .sort(poPrezimenu),
+    [baza, sektorId, pretragaZaposlenih],
+  );
+  const svihUSektoru = useMemo(
+    () => baza.zaposleni.filter((z) => z.sektorId === sektorId).length,
+    [baza.zaposleni, sektorId],
+  );
+  const aktivnaZaduzenja = useMemo(() => brojAktivnihZaduzenja(baza), [baza]);
+  const { deo, ostalo, jos, korak } = useVise(zaposleni, 25);
 
   if (!sektor) return null;
 
-  const zaposleni = baza.zaposleni.filter((z) => z.sektorId === sektor.id);
-  const kandidati = baza.nalozi.filter(
-    (n) =>
-      imaPravo(n, 'odobrenja.odlucuj', baza.pravaUloga) ||
-      imaPravo(n, 'zaduzenja.izdaj', baza.pravaUloga) ||
-      imaPravo(n, 'zaduzenja.vidi', baza.pravaUloga),
-  );
-
   function prebaci(n: Nalog, ukljuci: boolean) {
     const sledeci = ukljuci
-      ? Array.from(new Set([...(n.sektori ?? []), sektor!.id]))
-      : (n.sektori ?? []).filter((x) => x !== sektor!.id);
+      ? Array.from(new Set([...(n.sektori ?? []), sektorId]))
+      : (n.sektori ?? []).filter((x) => x !== sektorId);
     akcije.postaviNadleznost(n.id, sledeci, n.sviSektori);
     javi(ukljuci ? `${n.fullName} je nadležan za ${sektor!.naziv}.` : `${n.fullName} više nije nadležan za ${sektor!.naziv}.`);
   }
+
+  const nadleznih = kandidati.filter((n) => uNadleznosti(nadleznost(n), sektorId)).length;
 
   return (
     <Fioka open onClose={onClose} nadnaslov={`Sektor ${sektor.sifra}`} naslov={sektor.naziv}>
@@ -211,55 +298,114 @@ function NadleznostSektora({ sektor, onClose }: { sektor: Sektor | null; onClose
           zaposlenih. Ako uz to ima pravo odobravanja, njemu stižu i zahtevi za odobrenje.
         </p>
 
-        <Odeljak naslov="Nadležni nalozi" nadnaslov={`${kandidati.length} naloga`} ravno>
-          <ul className="divide-y divide-line">
-            {kandidati.map((n) => {
-              const pokriva = uNadleznosti(nadleznost(n), sektor.id);
-              const odobrava = imaPravo(n, 'odobrenja.odlucuj', baza.pravaUloga);
-              const izdaje = imaPravo(n, 'zaduzenja.izdaj', baza.pravaUloga);
-              return (
-                <li key={n.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-card border border-line bg-surface font-mono text-micro font-semibold">
-                    {inicijali(n.fullName)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{n.fullName}</span>
-                    <span className="block truncate text-micro text-ink-muted">
-                      {ULOGE[n.role].naziv}
-                      {odobrava && ' · odobrava'}
-                      {izdaje && ' · izdaje'}
-                      {!n.aktivan && ' · isključen'}
-                    </span>
-                  </span>
-                  {n.sviSektori ? (
-                    <Oznaka ton="accent">svi sektori</Oznaka>
-                  ) : (
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-[#D2650B]"
-                      checked={pokriva}
-                      onChange={(e) => prebaci(n, e.target.checked)}
-                      aria-label={`${n.fullName} nadležan za ${sektor.naziv}`}
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </Odeljak>
-
-        <Odeljak naslov="Zaposleni u sektoru" nadnaslov={`${zaposleni.length} zaposlenih`} ravno>
-          {zaposleni.length === 0 ? (
-            <Prazno naslov="Sektor je prazan" hint={'Zaposleni se raspoređuju na strani „Zaposleni”.'} />
+        <Odeljak
+          naslov="Nadležni nalozi"
+          nadnaslov={`${nadleznih} od ${kandidati.length} naloga`}
+          ravno
+          akcije={
+            <Filteri
+              vrednost={filterNaloga}
+              onChange={setFilterNaloga}
+              stavke={[['svi', 'Svi'], ['nadlezni', 'Nadležni'], ['ostali', 'Ostali']] as const}
+            />
+          }
+        >
+          <div className="border-b border-line p-2">
+            <Pretraga
+              value={pretragaNaloga}
+              onChange={setPretragaNaloga}
+              placeholder="Ime, korisničko ime ili uloga…"
+              sirina="w-full"
+            />
+          </div>
+          {nalozi.length === 0 ? (
+            <Prazno naslov="Nema naloga po ovim uslovima" />
           ) : (
             <ul className="divide-y divide-line">
-              {zaposleni.map((z) => (
-                <li key={z.id} className="flex items-center justify-between gap-3 px-4 py-2">
-                  <span className="truncate text-sm">{punoIme(z)}</span>
-                  <span className="truncate text-micro text-ink-muted">{z.radnoMesto}</span>
-                </li>
-              ))}
+              {nalozi.map((n) => {
+                const pokriva = uNadleznosti(nadleznost(n), sektor.id);
+                const odobrava = imaPravo(n, 'odobrenja.odlucuj', baza.pravaUloga);
+                const izdaje = imaPravo(n, 'zaduzenja.izdaj', baza.pravaUloga);
+                return (
+                  <li key={n.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-card border border-line bg-surface font-mono text-micro font-semibold">
+                      {inicijali(n.fullName)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{n.fullName}</span>
+                      <span className="block truncate text-micro text-ink-muted">
+                        {ULOGE[n.role].naziv}
+                        {odobrava && ' · odobrava'}
+                        {izdaje && ' · izdaje'}
+                        {!n.aktivan && ' · isključen'}
+                      </span>
+                    </span>
+                    {n.sviSektori ? (
+                      <Oznaka ton="accent">svi sektori</Oznaka>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[#D2650B]"
+                        checked={pokriva}
+                        onChange={(e) => prebaci(n, e.target.checked)}
+                        aria-label={`${n.fullName} nadležan za ${sektor.naziv}`}
+                      />
+                    )}
+                  </li>
+                );
+              })}
             </ul>
+          )}
+        </Odeljak>
+
+        <Odeljak
+          naslov="Zaposleni u sektoru"
+          nadnaslov={
+            zaposleni.length === svihUSektoru
+              ? `${svihUSektoru} zaposlenih`
+              : `${zaposleni.length} od ${svihUSektoru} zaposlenih`
+          }
+          ravno
+        >
+          {svihUSektoru === 0 ? (
+            <Prazno naslov="Sektor je prazan" hint={'Zaposleni se raspoređuju na strani „Zaposleni”.'} />
+          ) : (
+            <>
+              <div className="border-b border-line p-2">
+                <Pretraga
+                  value={pretragaZaposlenih}
+                  onChange={setPretragaZaposlenih}
+                  placeholder="Proveri da li je zaposleni u ovom sektoru…"
+                  sirina="w-full"
+                />
+              </div>
+              {zaposleni.length === 0 ? (
+                <Prazno
+                  naslov="Nije u ovom sektoru"
+                  hint="Po ovom pojmu nema nikoga u sektoru — potražite ga na strani „Zaposleni”."
+                />
+              ) : (
+                <>
+                  <ul className="divide-y divide-line">
+                    {deo.map((z) => (
+                      <li key={z.id} className="flex items-center gap-3 px-4 py-2">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm">
+                            {punoIme(z)}
+                            {!z.aktivan && <span className="ml-1.5 text-micro text-ink-faint">· neaktivan</span>}
+                          </span>
+                          <span className="block truncate text-micro text-ink-muted">{z.radnoMesto}</span>
+                        </span>
+                        <span className="shrink-0 font-mono text-micro text-ink-faint tnum">
+                          {aktivnaZaduzenja.get(z.id) ?? 0}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Vise ostalo={ostalo} korak={korak} onVise={jos} />
+                </>
+              )}
+            </>
           )}
         </Odeljak>
       </div>
