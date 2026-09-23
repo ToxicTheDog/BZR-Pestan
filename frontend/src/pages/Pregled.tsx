@@ -11,7 +11,7 @@ import type { Zaduzenje } from '../lib/types';
 export function Pregled() {
   const { baza, ja, smem } = useStore();
   const sada = useSada(1000);
-  const presek = napraviPresek(baza, sada);
+  const presek = napraviPresek(baza, sada, ja);
 
   const paznja: Zaduzenje[] = [...presek.isteklo, ...presek.kriticno, ...presek.uskoro];
   const sat = new Date().getHours();

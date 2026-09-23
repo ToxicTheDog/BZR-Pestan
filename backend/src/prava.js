@@ -12,7 +12,7 @@ export const SVA_PRAVA = [
   'kartoni.vidi', 'kartoni.upis',
   'zaposleni.vidi', 'zaposleni.upis',
   'mail.vidi', 'mail.posalji',
-  'nalozi.upravljaj', 'podesavanja.upravljaj', 'logovi.vidi',
+  'sektori.upravljaj', 'nalozi.upravljaj', 'podesavanja.upravljaj', 'logovi.vidi',
 ];
 
 export const PODRAZUMEVANA_PRAVA = {
@@ -36,6 +36,17 @@ export const PODRAZUMEVANA_PRAVA = {
     'mail.vidi',
   ],
 };
+
+/**
+ * Nadležnost po sektorima. `sviSektori` oslobađa nalog podele; inače vidi
+ * samo ono što pripada sektorima iz `nalog.sektori`. Isto pravilo kao na
+ * frontendu (`frontend/src/lib/izbor.ts`).
+ */
+export function uNadleznosti(nalog, sektorId) {
+  if (!nalog) return false;
+  if (nalog.sviSektori) return true;
+  return Boolean(sektorId) && (nalog.sektori ?? []).includes(sektorId);
+}
 
 /**
  * Konačno pravo: pravo uloge, osim ako admin nije postavio izuzetak baš za

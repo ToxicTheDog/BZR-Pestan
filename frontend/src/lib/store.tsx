@@ -3,13 +3,13 @@ import {
 } from 'react';
 import type {
   Baza, Karton, Kategorija, Kontrola, Mail, Nalog, Oprema, Permission, Podesavanja, Razduzenje,
-  Role, Sablon, StanjeVracene, Zaduzenje, Zaposleni,
+  Role, Sablon, Sektor, StanjeVracene, Zaduzenje, Zaposleni,
 } from './types';
 import { napraviBazu } from '../demo/seed';
 import { imaPravo } from './permissions';
 import { otisak } from './format';
 
-const KLJUC = 'bzr-pestan-demo-v2';
+const KLJUC = 'bzr-pestan-demo-v3';
 const KLJUC_SESIJA = 'bzr-pestan-sesija-v1';
 
 /**
@@ -22,7 +22,7 @@ function ucitaj(): Baza {
     if (sirovo) {
       const b = JSON.parse(sirovo) as Baza;
       // Sanity provera: ako nedostaje bilo koja kolekcija, kreni od nule.
-      if (b.nalozi && b.oprema && b.kartoni && b.kategorije) return b;
+      if (b.nalozi && b.oprema && b.kartoni && b.kategorije && b.sektori) return b;
     }
   } catch {
     /* pokvaren zapis — vraćamo se na sveže demo podatke */
@@ -59,6 +59,12 @@ type Akcije = {
   obrisiKategoriju: (id: string) => void;
   /** Premešta opremu u drugu kategoriju; rok se dalje nasleđuje iz nove. */
   premestiOpremu: (opremaIds: string[], kategorijaId: string) => void;
+  /* sektori i nadležnost */
+  dodajSektor: (s: Omit<Sektor, 'id'>) => void;
+  izmeniSektor: (id: string, izmene: Partial<Sektor>) => void;
+  obrisiSektor: (id: string) => void;
+  /** Postavlja nadležnost naloga; `svi` oslobađa naloga sektorske podele. */
+  postaviNadleznost: (nalogId: string, sektori: string[], svi: boolean) => void;
   /* zaposleni */
   dodajZaposlenog: (z: Omit<Zaposleni, 'id'>) => void;
   izmeniZaposlenog: (id: string, izmene: Partial<Zaposleni>) => void;
@@ -91,7 +97,9 @@ type Akcije = {
   posaljiMail: (m: Omit<Mail, 'id' | 'createdAt' | 'status'>) => void;
   izmeniSablon: (id: string, izmene: Partial<Sablon>) => void;
   /* nalozi i konfiguracija */
-  dodajNalog: (n: Omit<Nalog, 'id' | 'createdAt' | 'lastLoginAt' | 'izuzeci' | 'potpis' | 'sertifikat'>) => void;
+  dodajNalog: (
+    n: Omit<Nalog, 'id' | 'createdAt' | 'lastLoginAt' | 'izuzeci' | 'potpis' | 'sertifikat' | 'sektori' | 'sviSektori'>,
+  ) => void;
   izmeniNalog: (id: string, izmene: Partial<Nalog>) => void;
   obrisiNalog: (id: string) => void;
   postaviIzuzetak: (nalogId: string, pravo: Permission, vrednost: boolean | undefined) => void;
@@ -233,6 +241,65 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
 
+      dodajSektor(sektor) {
+        setBaza((b) =>
+          saLogom(
+            { ...b, sektori: [...b.sektori, { ...sektor, id: id('s') }] },
+            'Dodat sektor',
+            sektor.naziv,
+            sektor.opis,
+            koSam(),
+          ),
+        );
+      },
+
+      izmeniSektor(sektorId, izmene) {
+        setBaza((b) =>
+          saLogom(
+            { ...b, sektori: b.sektori.map((x) => (x.id === sektorId ? { ...x, ...izmene } : x)) },
+            'Izmenjen sektor',
+            b.sektori.find((x) => x.id === sektorId)?.naziv ?? sektorId,
+            Object.keys(izmene).join(', '),
+            koSam(),
+          ),
+        );
+      },
+
+      obrisiSektor(sektorId) {
+        setBaza((b) => {
+          const sektor = b.sektori.find((x) => x.id === sektorId);
+          if (!sektor) return b;
+          return saLogom(
+            {
+              ...b,
+              sektori: b.sektori.filter((x) => x.id !== sektorId),
+              // Nadležnost naloga ne sme da pokazuje na sektor koji više ne postoji.
+              nalozi: b.nalozi.map((n) => ({ ...n, sektori: (n.sektori ?? []).filter((x) => x !== sektorId) })),
+            },
+            'Obrisan sektor',
+            sektor.naziv,
+            'Sektor uklonjen iz organizacione šeme.',
+            koSam(),
+          );
+        });
+      },
+
+      postaviNadleznost(nalogId, sektori, svi) {
+        setBaza((b) => {
+          const nalog = b.nalozi.find((n) => n.id === nalogId);
+          const imena = svi
+            ? 'svi sektori'
+            : sektori.map((x) => b.sektori.find((y) => y.id === x)?.naziv ?? x).join(', ') || 'bez sektora';
+          return saLogom(
+            { ...b, nalozi: b.nalozi.map((n) => (n.id === nalogId ? { ...n, sektori, sviSektori: svi } : n)) },
+            'Izmenjena nadležnost',
+            `Nalog ${nalog?.username ?? nalogId}`,
+            `Nadležnost: ${imena}.`,
+            koSam(),
+          );
+        });
+      },
+
       dodajZaposlenog(z) {
         setBaza((b) =>
           saLogom({ ...b, zaposleni: [{ ...z, id: id('z') }, ...b.zaposleni] }, 'Dodat zaposleni', `${z.ime} ${z.prezime}`, z.radnoMesto, koSam()),
@@ -256,6 +323,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           id: id('zd'),
           broj: sledeciBroj('ZAD', baza.zaduzenja.map((z) => z.broj)),
           zaposleniId: ulaz.zaposleniId,
+          sektorId: baza.zaposleni.find((z) => z.id === ulaz.zaposleniId)?.sektorId ?? '',
           stavke: ulaz.stavke,
           izdaoId: ja?.id ?? 'n2',
           odobrioId: null,
@@ -548,6 +616,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           potpis: null,
           sertifikat: null,
           izuzeci: {},
+          sektori: [],
+          sviSektori: false,
         };
         setBaza((b) =>
           saLogom({ ...b, nalozi: [...b.nalozi, nov] }, 'Kreiran nalog', `Nalog ${nov.username}`, `Uloga: ${nov.role}.`, koSam()),

@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Stamp } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { nadjiNalog, nadjiZaposlenog, opisStavki, punoIme, rokZaduzenja } from '../lib/izbor';
+import {
+  nadjiNalog, nadjiZaposlenog, opisStavki, punoIme, rokZaduzenja, vidljivaRazduzenja, vidljivaZaduzenja,
+} from '../lib/izbor';
 import { datum, datumVreme, sadrzi, useSada } from '../lib/format';
 import type { StanjeVracene } from '../lib/types';
 import { Zaglavlje, SaDosijeom } from '../components/Shell';
@@ -26,13 +28,13 @@ const NAZIV_STANJA: Record<StanjeVracene, string> = {
 };
 
 export function Razduzenja() {
-  const { baza, smem } = useStore();
+  const { baza, ja, smem } = useStore();
   const sada = useSada(1000);
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<'zaduzeno' | 'vraceno'>('zaduzeno');
   const [pretraga, setPretraga] = useState('');
 
-  const zaRazduzenje = baza.zaduzenja.find((z) => z.id === params.get('razduzi')) ?? null;
+  const zaRazduzenje = vidljivaZaduzenja(baza, ja).find((z) => z.id === params.get('razduzi')) ?? null;
   const postavi = (v: string | null) => {
     const next = new URLSearchParams(params);
     if (v) next.set('razduzi', v);
@@ -42,24 +44,24 @@ export function Razduzenja() {
 
   const aktivna = useMemo(
     () =>
-      baza.zaduzenja
+      vidljivaZaduzenja(baza, ja)
         .filter((z) => z.status === 'aktivno')
         .filter((z) => !pretraga || sadrzi(punoIme(nadjiZaposlenog(baza, z.zaposleniId)), pretraga) || sadrzi(z.broj, pretraga))
         .sort((a, b) => new Date(a.dueAt ?? 0).getTime() - new Date(b.dueAt ?? 0).getTime()),
-    [baza, pretraga],
+    [baza, ja, pretraga],
   );
 
   const vracena = useMemo(
     () =>
-      baza.razduzenja.filter((r) => {
+      vidljivaRazduzenja(baza, ja).filter((r) => {
         if (!pretraga) return true;
         const z = baza.zaduzenja.find((x) => x.id === r.zaduzenjeId);
         return sadrzi(r.broj, pretraga) || sadrzi(punoIme(nadjiZaposlenog(baza, z?.zaposleniId ?? '')), pretraga);
       }),
-    [baza, pretraga],
+    [baza, ja, pretraga],
   );
 
-  const poStanju = (s: StanjeVracene) => baza.razduzenja.filter((r) => r.stanje === s).length;
+  const poStanju = (s: StanjeVracene) => vidljivaRazduzenja(baza, ja).filter((r) => r.stanje === s).length;
 
   return (
     <>
@@ -85,7 +87,7 @@ export function Razduzenja() {
 
             <Odeljak naslov="Poslednji povrati" nadnaslov="Hronologija" ravno>
               <ul className="divide-y divide-line">
-                {baza.razduzenja.slice(0, 5).map((r) => {
+                {vidljivaRazduzenja(baza, ja).slice(0, 5).map((r) => {
                   const z = baza.zaduzenja.find((x) => x.id === r.zaduzenjeId);
                   return (
                     <li key={r.id} className="px-4 py-2">

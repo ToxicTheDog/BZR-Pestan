@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarPlus, PenLine, Plus, Printer, Stamp } from 'lucide-react';
 import { useStore } from '../lib/store';
 import {
-  OZNAKA_STATUSA, brojKomada, nadjiNalog, nadjiOpremu, nadjiZaposlenog, opisStavki, punoIme, rokZaduzenja,
+  OZNAKA_STATUSA, brojKomada, nadjiNalog, nadjiOpremu, nadjiZaposlenog, nazivSektora, opisStavki,
+  punoIme, rokZaduzenja, vidljivaZaduzenja,
 } from '../lib/izbor';
 import { datum, datumVreme, sadrzi, useSada } from '../lib/format';
 import type { Zaduzenje } from '../lib/types';
@@ -29,15 +30,17 @@ const FILTERI = [
 type Filter = (typeof FILTERI)[number][0];
 
 export function Zaduzenja() {
-  const { baza, smem } = useStore();
+  const { baza, ja, smem } = useStore();
   const sada = useSada(1000);
   const [params, setParams] = useSearchParams();
   const [pretraga, setPretraga] = useState('');
 
   const filter = (params.get('filter') as Filter) || 'sva';
-  const otvoreno = baza.zaduzenja.find((z) => z.id === params.get('otvori')) ?? null;
-  const zaPotpis = baza.zaduzenja.find((z) => z.id === params.get('potpis')) ?? null;
-  const zaRazduzenje = baza.zaduzenja.find((z) => z.id === params.get('razduzi')) ?? null;
+  // I direktan link na dokument poštuje nadležnost.
+  const dozvoljena = vidljivaZaduzenja(baza, ja);
+  const otvoreno = dozvoljena.find((z) => z.id === params.get('otvori')) ?? null;
+  const zaPotpis = dozvoljena.find((z) => z.id === params.get('potpis')) ?? null;
+  const zaRazduzenje = dozvoljena.find((z) => z.id === params.get('razduzi')) ?? null;
 
   const postavi = (kljuc: string, vrednost: string | null) => {
     const next = new URLSearchParams(params);
@@ -46,8 +49,9 @@ export function Zaduzenja() {
     setParams(next, { replace: true });
   };
 
+  // Osnovni skup su zaduženja iz sektora u nadležnosti naloga.
   const prikazana = useMemo(() => {
-    return baza.zaduzenja.filter((z) => {
+    return vidljivaZaduzenja(baza, ja).filter((z) => {
       const rok = rokZaduzenja(baza, z, sada);
       if (filter === 'aktivno' && z.status !== 'aktivno') return false;
       if (filter === 'ceka_potpis' && z.status !== 'ceka_potpis') return false;
@@ -62,10 +66,10 @@ export function Zaduzenja() {
         sadrzi(z.broj, pretraga) ||
         sadrzi(punoIme(zap), pretraga) ||
         sadrzi(opisStavki(baza, z), pretraga) ||
-        sadrzi(zap?.organizacionaJedinica, pretraga)
+        sadrzi(nazivSektora(baza, zap?.sektorId), pretraga)
       );
     });
-  }, [baza, filter, pretraga, sada]);
+  }, [baza, ja, filter, pretraga, sada]);
 
   return (
     <>
@@ -120,7 +124,7 @@ export function Zaduzenja() {
                       <td className="td font-mono text-micro tnum">{z.broj}</td>
                       <td className="td">
                         <div className="font-medium">{punoIme(zap)}</div>
-                        <div className="text-micro text-ink-faint">{zap?.organizacionaJedinica}</div>
+                        <div className="text-micro text-ink-faint">{nazivSektora(baza, zap?.sektorId)}</div>
                       </td>
                       <td className="td">
                         <div className="max-w-[22rem] truncate">{opisStavki(baza, z)}</div>
@@ -250,7 +254,7 @@ function Detalj({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Podatak label="Zaposleni">{punoIme(zap)}</Podatak>
           <Podatak label="Radno mesto">{zap?.radnoMesto}</Podatak>
-          <Podatak label="Organizaciona jedinica">{zap?.organizacionaJedinica}</Podatak>
+          <Podatak label="Sektor">{nazivSektora(baza, zap?.sektorId)}</Podatak>
           <Podatak label="Izdao">{nadjiNalog(baza, zaduzenje.izdaoId)?.fullName ?? '—'}</Podatak>
           <Podatak label="Odobrio">{nadjiNalog(baza, zaduzenje.odobrioId)?.fullName ?? 'nije traženo'}</Podatak>
           <Podatak label="Kreirano" mono>{datumVreme(zaduzenje.createdAt)}</Podatak>

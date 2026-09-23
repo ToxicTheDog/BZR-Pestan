@@ -11,7 +11,7 @@ import { ucitaj } from './baza.js';
 import { obradiGreske } from './greske.js';
 import { auth } from './rute/auth.js';
 import { nalozi } from './rute/nalozi.js';
-import { kategorije, oprema, zaposleni } from './rute/sifarnik.js';
+import { kategorije, oprema, sektori, zaposleni } from './rute/sifarnik.js';
 import { logovi, podesavanja } from './rute/sistem.js';
 
 const app = express();
@@ -34,6 +34,7 @@ app.get('/api/zdravlje', (_req, res) => {
 
 app.use('/api/auth', auth);
 app.use('/api/nalozi', nalozi);
+app.use('/api/sektori', sektori);
 app.use('/api/zaposleni', zaposleni);
 app.use('/api/kategorije', kategorije);
 app.use('/api/oprema', oprema);

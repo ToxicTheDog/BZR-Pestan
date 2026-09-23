@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Send } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { punoIme } from '../lib/izbor';
+import { punoIme, vidljivaPosta, vidljiviZaposleni } from '../lib/izbor';
 import { datumVreme, relativno, sadrzi } from '../lib/format';
 import type { Mail, StatusMaila } from '../lib/types';
 import { Zaglavlje, SaDosijeom } from '../components/Shell';
@@ -22,16 +22,20 @@ const NAZIV_STATUSA: Record<StatusMaila, string> = {
 };
 
 export function Posta() {
-  const { baza, akcije, smem } = useStore();
+  const { baza, akcije, ja, smem } = useStore();
   const javi = useToast();
   const [tab, setTab] = useState<'poslato' | 'sabloni'>('poslato');
   const [pretraga, setPretraga] = useState('');
   const [otvoren, setOtvoren] = useState<Mail | null>(null);
   const [novaPoruka, setNovaPoruka] = useState(false);
 
+  // Pošta se vidi samo za zaposlene iz sektora u nadležnosti naloga.
   const lista = useMemo(
-    () => baza.mailovi.filter((m) => !pretraga || sadrzi(m.tema, pretraga) || sadrzi(m.zaIme, pretraga) || sadrzi(m.za, pretraga)),
-    [baza.mailovi, pretraga],
+    () =>
+      vidljivaPosta(baza, ja).filter(
+        (m) => !pretraga || sadrzi(m.tema, pretraga) || sadrzi(m.zaIme, pretraga) || sadrzi(m.za, pretraga),
+      ),
+    [baza, ja, pretraga],
   );
 
   return (
@@ -71,7 +75,7 @@ export function Posta() {
                   <div key={s} className="flex items-center justify-between gap-3 px-4 py-2">
                     <dt className="text-micro text-ink-muted">{NAZIV_STATUSA[s]}</dt>
                     <dd className="font-mono text-sm font-semibold tnum">
-                      {baza.mailovi.filter((m) => m.status === s).length}
+                      {vidljivaPosta(baza, ja).filter((m) => m.status === s).length}
                     </dd>
                   </div>
                 ))}
@@ -192,7 +196,7 @@ export function Posta() {
 }
 
 function NovaPoruka({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { baza, akcije } = useStore();
+  const { baza, akcije, ja } = useStore();
   const javi = useToast();
   const [primalac, setPrimalac] = useState('');
   const [sablonId, setSablonId] = useState('');
@@ -252,7 +256,7 @@ function NovaPoruka({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Polje label="Primalac">
             <select className="input" value={primalac} onChange={(e) => setPrimalac(e.target.value)}>
               <option value="">— izaberite zaposlenog —</option>
-              {baza.zaposleni.map((z) => (
+              {vidljiviZaposleni(baza, ja).map((z) => (
                 <option key={z.id} value={z.id}>{punoIme(z)}</option>
               ))}
             </select>

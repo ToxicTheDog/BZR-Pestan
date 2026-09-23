@@ -1,5 +1,6 @@
 import type {
-  Baza, Karton, Kategorija, Kontrola, Mail, Nalog, Oprema, Razduzenje, Sablon, Zaduzenje, Zaposleni,
+  Baza, Karton, Kategorija, Kontrola, Mail, Nalog, Oprema, Razduzenje, Sablon, Sektor,
+  Zaduzenje, Zaposleni,
 } from '../lib/types';
 import { PODRAZUMEVANA_PRAVA } from '../lib/permissions';
 import { otisak } from '../lib/format';
@@ -20,6 +21,19 @@ const digitalni = (ime: string, sert: string, vreme: string) => ({
   vreme,
 });
 
+/* ----------------------------- Sektori ----------------------------- */
+
+const sektori: Sektor[] = [
+  { id: 's1', naziv: 'Ekstruzija', sifra: 'EKS', opis: 'Linije za ekstruziju cevi.', aktivan: true },
+  { id: 's2', naziv: 'Brizganje', sifra: 'BRZ', opis: 'Brizgalice i montaža fitinga.', aktivan: true },
+  { id: 's3', naziv: 'Alatnica', sifra: 'ALT', opis: 'Izrada i održavanje alata.', aktivan: true },
+  { id: 's4', naziv: 'Održavanje', sifra: 'ODR', opis: 'Mašinsko i elektro održavanje.', aktivan: true },
+  { id: 's5', naziv: 'Magacin', sifra: 'MAG', opis: 'Prijem, skladištenje i otprema.', aktivan: true },
+  { id: 's6', naziv: 'Kontrola kvaliteta', sifra: 'KVL', opis: 'Laboratorija i kontrola proizvoda.', aktivan: true },
+  { id: 's7', naziv: 'Transport', sifra: 'TRN', opis: 'Vozni park i isporuka.', aktivan: true },
+  { id: 's8', naziv: 'Nabavka', sifra: 'NAB', opis: 'Nabavka i ugovaranje.', aktivan: true },
+];
+
 /* ----------------------------- Nalozi ----------------------------- */
 
 const nalozi: Nalog[] = [
@@ -28,7 +42,7 @@ const nalozi: Nalog[] = [
     email: 'nikola.ivanovic@pestan.rs', telefon: '034/700-121', role: 'admin',
     aktivan: true, createdAt: pre(420), lastLoginAt: pre(0, 2), mustChangePassword: false,
     potpis: demoPotpis('Nikola Ivanović'), sertifikat: 'PEST-CA-0001',
-    izuzeci: {},
+    izuzeci: {}, sektori: [], sviSektori: true,
   },
   {
     id: 'n2', username: 'm.stankovic', fullName: 'Marija Stanković',
@@ -36,6 +50,7 @@ const nalozi: Nalog[] = [
     aktivan: true, createdAt: pre(390), lastLoginAt: pre(0, 5), mustChangePassword: false,
     potpis: demoPotpis('Marija Stanković'), sertifikat: 'PEST-CA-0014',
     izuzeci: { 'inventar.brisanje': true },
+    sektori: ['s1', 's2', 's6'], sviSektori: false,
   },
   {
     id: 'n3', username: 'd.petrovic', fullName: 'Dragan Petrović',
@@ -43,13 +58,14 @@ const nalozi: Nalog[] = [
     aktivan: true, createdAt: pre(240), lastLoginAt: pre(1, 3), mustChangePassword: false,
     potpis: demoPotpis('Dragan Petrović'), sertifikat: 'PEST-CA-0021',
     izuzeci: { 'mail.posalji': false },
+    sektori: ['s3', 's4', 's5', 's7'], sviSektori: false,
   },
   {
     id: 'n4', username: 's.jovanovic', fullName: 'Sonja Jovanović',
     email: 'sonja.jovanovic@pestan.rs', telefon: '034/700-118', role: 'odobrilac',
     aktivan: true, createdAt: pre(365), lastLoginAt: pre(0, 9), mustChangePassword: false,
     potpis: demoPotpis('Sonja Jovanović'), sertifikat: 'PEST-CA-0008',
-    izuzeci: {},
+    izuzeci: {}, sektori: ['s1', 's2', 's6'], sviSektori: false,
   },
   {
     id: 'n5', username: 'v.markovic', fullName: 'Vladimir Marković',
@@ -57,13 +73,14 @@ const nalozi: Nalog[] = [
     aktivan: true, createdAt: pre(150), lastLoginAt: pre(4), mustChangePassword: true,
     potpis: null, sertifikat: null,
     izuzeci: { 'zaduzenja.produzi': true },
+    sektori: ['s3', 's4', 's5', 's7', 's8'], sviSektori: false,
   },
   {
     id: 'n6', username: 'a.tomic', fullName: 'Ana Tomić',
     email: 'ana.tomic@pestan.rs', telefon: '034/700-147', role: 'usluzilac',
     aktivan: false, createdAt: pre(500), lastLoginAt: pre(96), mustChangePassword: false,
     potpis: demoPotpis('Ana Tomić'), sertifikat: 'PEST-CA-0004',
-    izuzeci: {},
+    izuzeci: {}, sektori: ['s5'], sviSektori: false,
   },
 ];
 
@@ -88,12 +105,14 @@ const zaposleniRed: Z[] = [
   ['Zoran', 'Antić', 'Rukovodilac smene', 'Brizganje', 'Hala 3', '44', 'XL', 4, 85],
 ];
 
+const idSektora = (naziv: string) => sektori.find((s) => s.naziv === naziv)?.id ?? sektori[0].id;
+
 const zaposleni: Zaposleni[] = zaposleniRed.map((r, i) => ({
   id: `z${i + 1}`,
   ime: r[0],
   prezime: r[1] === 'Ристić' ? 'Ristić' : r[1],
   radnoMesto: r[2],
-  organizacionaJedinica: r[3],
+  sektorId: idSektora(r[3]),
   lokacija: r[4],
   email: `zaposleni${i + 1}@pestan.rs`,
   telefon: `06${(i % 6) + 2}/${300 + i}-${100 + i * 7}`,
@@ -237,6 +256,7 @@ const zaduzenja: Zaduzenje[] = zadRed.map((r, i) => {
     id: `zd${r.id}`,
     broj: `ZAD-2026-${String(i + 1).padStart(4, '0')}`,
     zaposleniId: r.zap,
+    sektorId: zaposleni.find((z) => z.id === r.zap)?.sektorId ?? '',
     stavke: r.stavke.map(([opremaId, kolicina]) => ({
       opremaId,
       kolicina,
@@ -454,6 +474,7 @@ export function napraviBazu(): Baza {
   return {
     nalozi,
     zaposleni,
+    sektori,
     kategorije,
     oprema,
     zaduzenja,
