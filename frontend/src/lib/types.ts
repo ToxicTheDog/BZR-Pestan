@@ -21,6 +21,7 @@ export type Permission =
   | 'zaposleni.upis'
   | 'mail.vidi'
   | 'mail.posalji'
+  | 'sektori.upravljaj'
   | 'nalozi.upravljaj'
   | 'podesavanja.upravljaj'
   | 'logovi.vidi';
@@ -42,6 +43,25 @@ export type Nalog = {
   sertifikat: string | null;
   /** Izuzeci koje admin postavlja pojedinačno, preko prava uloge. */
   izuzeci: Partial<Record<Permission, boolean>>;
+  /**
+   * Sektori koje nalog pokriva — jedini izvor istine za nadležnost.
+   * Za uslužioca znači „koga uslužuje", za odobrioca „kome odobrava".
+   */
+  sektori: string[];
+  /** Nadležnost nad svim sektorima (administrator, lice za BZR). */
+  sviSektori: boolean;
+};
+
+/**
+ * Organizaciona celina firme. Nosi podelu nadležnosti: ko čije zahteve
+ * odobrava i čija zaduženja uopšte vidi.
+ */
+export type Sektor = {
+  id: string;
+  naziv: string;
+  sifra: string;
+  opis: string;
+  aktivan: boolean;
 };
 
 export type Zaposleni = {
@@ -49,7 +69,7 @@ export type Zaposleni = {
   ime: string;
   prezime: string;
   radnoMesto: string;
-  organizacionaJedinica: string;
+  sektorId: string;
   lokacija: string;
   email: string;
   telefon: string;
@@ -122,6 +142,11 @@ export type Zaduzenje = {
   id: string;
   broj: string;
   zaposleniId: string;
+  /**
+   * Sektor zaposlenog u trenutku izdavanja. Snima se da bi istorija ostala
+   * tačna i kad zaposleni kasnije pređe u drugi sektor.
+   */
+  sektorId: string;
   stavke: StavkaZaduzenja[];
   izdaoId: string;
   odobrioId: string | null;
@@ -259,6 +284,7 @@ export type Podesavanja = {
 export type Baza = {
   nalozi: Nalog[];
   zaposleni: Zaposleni[];
+  sektori: Sektor[];
   kategorije: Kategorija[];
   oprema: Oprema[];
   zaduzenja: Zaduzenje[];

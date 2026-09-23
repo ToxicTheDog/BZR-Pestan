@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlarmClock, ShieldCheck } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { nadjiOpremu, nadjiZaposlenog, punoIme } from '../lib/izbor';
+import { nadjiOpremu, nadjiZaposlenog, nazivSektora, punoIme } from '../lib/izbor';
 import { danaRec, datumVreme, otisak } from '../lib/format';
 import type { StanjeVracene, Zaduzenje } from '../lib/types';
 import { Modal, Polje, useToast } from './ui';
@@ -87,7 +87,7 @@ export function DijalogPotpisa({
             <div className="eyebrow">Prima</div>
             <div className="text-sm font-medium">{punoIme(zaposleni)}</div>
             <div className="text-micro text-ink-muted">
-              {zaposleni?.radnoMesto} · {zaposleni?.organizacionaJedinica}
+              {zaposleni?.radnoMesto} · {nazivSektora(baza, zaposleni?.sektorId)}
             </div>
           </div>
 

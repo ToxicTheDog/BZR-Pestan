@@ -1,20 +1,25 @@
 import { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { brojKomada, kategorijaOpreme, nadjiNalog, nadjiOpremu, nadjiZaposlenog, punoIme } from '../lib/izbor';
+import {
+  brojKomada, kategorijaOpreme, nadjiNalog, nadjiOpremu, nadjiZaposlenog, nazivSektora, punoIme,
+  vidljivaZaduzenja,
+} from '../lib/izbor';
 import { danaRec, datumVreme, relativno } from '../lib/format';
 import { Zaglavlje, SaDosijeom } from '../components/Shell';
 import { Modal, Odeljak, Oznaka, Polje, Prazno, useToast } from '../components/ui';
 import { StatusOznaka } from './Zaduzenja';
 
 export function Odobrenja() {
-  const { baza, akcije, smem } = useStore();
+  const { baza, akcije, ja, smem } = useStore();
   const javi = useToast();
   const [odbijanje, setOdbijanje] = useState<string | null>(null);
   const [razlog, setRazlog] = useState('');
 
-  const naCekanju = baza.zaduzenja.filter((z) => z.status === 'ceka_odobrenje');
-  const odluceno = baza.zaduzenja
+  // Odobrilac rešava samo zahteve iz sektora za koje je nadležan.
+  const mojaZaduzenja = vidljivaZaduzenja(baza, ja);
+  const naCekanju = mojaZaduzenja.filter((z) => z.status === 'ceka_odobrenje');
+  const odluceno = mojaZaduzenja
     .filter((z) => z.odobrenoAt && z.status !== 'ceka_odobrenje')
     .sort((a, b) => new Date(b.odobrenoAt!).getTime() - new Date(a.odobrenoAt!).getTime());
 
@@ -124,7 +129,7 @@ export function Odobrenja() {
 
                     <dl className="divide-y divide-line border-y border-line">
                       <Red label="Radno mesto" vrednost={zap?.radnoMesto ?? '—'} />
-                      <Red label="Organizaciona jedinica" vrednost={zap?.organizacionaJedinica ?? '—'} />
+                      <Red label="Sektor" vrednost={nazivSektora(baza, zap?.sektorId)} />
                       <Red label="Lokacija" vrednost={zap?.lokacija ?? '—'} />
                       <Red label="Traženi rok" vrednost={z.rokDana > 0 ? danaRec(z.rokDana) : 'trajno'} />
                       <Red label="Ukupno komada" vrednost={String(brojKomada(z))} />

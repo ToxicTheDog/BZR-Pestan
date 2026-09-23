@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClipboardList, Plus } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { punoIme, rokZaduzenja } from '../lib/izbor';
+import { nazivSektora, punoIme, rokZaduzenja, vidljivaZaduzenja, vidljiviZaposleni } from '../lib/izbor';
 import { danaDo, datum, sadrzi, useSada } from '../lib/format';
 import type { Zaposleni as TZaposleni } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
@@ -10,25 +10,30 @@ import { Brojac, Fioka, Modal, Odeljak, Oznaka, Podatak, Polje, Prazno, Pretraga
 import { RokOznaka } from '../components/Rok';
 
 const prazan: Omit<TZaposleni, 'id'> = {
-  ime: '', prezime: '', radnoMesto: '', organizacionaJedinica: '', lokacija: 'Hala 1',
+  ime: '', prezime: '', radnoMesto: '', sektorId: '', lokacija: 'Hala 1',
   email: '', telefon: '', datumZaposlenja: new Date().toISOString(), brojCipela: '', konfekcija: '',
   aktivan: true, lekarskiVazi: null, obukaBzrVazi: null,
 };
 
 export function Zaposleni() {
-  const { baza, akcije, smem } = useStore();
+  const { baza, akcije, ja, smem } = useStore();
   const javi = useToast();
   const sada = useSada(1000);
   const [pretraga, setPretraga] = useState('');
   const [detalj, setDetalj] = useState<TZaposleni | null>(null);
   const [forma, setForma] = useState<Omit<TZaposleni, 'id'> | null>(null);
 
+  // Vide se samo zaposleni iz sektora u nadležnosti naloga.
   const lista = useMemo(
     () =>
-      baza.zaposleni.filter(
-        (z) => !pretraga || sadrzi(punoIme(z), pretraga) || sadrzi(z.radnoMesto, pretraga) || sadrzi(z.organizacionaJedinica, pretraga),
+      vidljiviZaposleni(baza, ja).filter(
+        (z) =>
+          !pretraga ||
+          sadrzi(punoIme(z), pretraga) ||
+          sadrzi(z.radnoMesto, pretraga) ||
+          sadrzi(nazivSektora(baza, z.sektorId), pretraga),
       ),
-    [baza.zaposleni, pretraga],
+    [baza, ja, pretraga],
   );
 
   return (
@@ -63,7 +68,7 @@ export function Zaposleni() {
                 <tr>
                   <th className="th">Ime i prezime</th>
                   <th className="th">Radno mesto</th>
-                  <th className="th w-40">Služba</th>
+                  <th className="th w-40">Sektor</th>
                   <th className="th w-24">Obuća / konf.</th>
                   <th className="th w-28">Lekarski</th>
                   <th className="th w-28">Obuka BZR</th>
@@ -77,7 +82,7 @@ export function Zaposleni() {
                     <tr key={z.id} className="row cursor-pointer" onClick={() => setDetalj(z)}>
                       <td className="td font-medium">{punoIme(z)}</td>
                       <td className="td text-micro">{z.radnoMesto}</td>
-                      <td className="td text-micro">{z.organizacionaJedinica}</td>
+                      <td className="td text-micro">{nazivSektora(baza, z.sektorId)}</td>
                       <td className="td font-mono text-micro tnum">
                         {z.brojCipela} / {z.konfekcija}
                       </td>
@@ -96,7 +101,7 @@ export function Zaposleni() {
       <Fioka
         open={Boolean(detalj)}
         onClose={() => setDetalj(null)}
-        nadnaslov={detalj?.organizacionaJedinica}
+        nadnaslov={detalj ? nazivSektora(baza, detalj.sektorId) : undefined}
         naslov={detalj ? punoIme(detalj) : ''}
         akcije={
           detalj && (
@@ -126,7 +131,7 @@ export function Zaposleni() {
 
             <Odeljak naslov="Zaduženja" nadnaslov="Trenutno i ranije" ravno>
               <ul className="divide-y divide-line">
-                {baza.zaduzenja
+                {vidljivaZaduzenja(baza, ja)
                   .filter((z) => z.zaposleniId === detalj.id)
                   .map((z) => {
                     const rok = rokZaduzenja(baza, z, sada);
@@ -156,7 +161,7 @@ export function Zaposleni() {
             <button className="btn-secondary" onClick={() => setForma(null)}>Odustani</button>
             <button
               className="btn-primary"
-              disabled={!forma?.ime.trim() || !forma?.prezime.trim()}
+              disabled={!forma?.ime.trim() || !forma?.prezime.trim() || !forma?.sektorId}
               onClick={() => {
                 akcije.dodajZaposlenog(forma!);
                 javi('Zaposleni je dodat.');
@@ -179,8 +184,13 @@ export function Zaposleni() {
             <Polje label="Radno mesto">
               <input className="input" value={forma.radnoMesto} onChange={(e) => setForma({ ...forma, radnoMesto: e.target.value })} />
             </Polje>
-            <Polje label="Organizaciona jedinica">
-              <input className="input" value={forma.organizacionaJedinica} onChange={(e) => setForma({ ...forma, organizacionaJedinica: e.target.value })} />
+            <Polje label="Sektor" hint="Određuje ko vidi i ko odobrava njegova zaduženja.">
+              <select className="input" value={forma.sektorId} onChange={(e) => setForma({ ...forma, sektorId: e.target.value })}>
+                <option value="">— izaberite sektor —</option>
+                {baza.sektori.map((s) => (
+                  <option key={s.id} value={s.id}>{s.naziv}</option>
+                ))}
+              </select>
             </Polje>
             <Polje label="Lokacija">
               <input className="input" value={forma.lokacija} onChange={(e) => setForma({ ...forma, lokacija: e.target.value })} />

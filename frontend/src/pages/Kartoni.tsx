@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FilePlus2, Mail, Pencil, Printer } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { nadjiNalog, nadjiOpremu, punoIme, rokZaduzenja } from '../lib/izbor';
+import { nadjiNalog, nadjiOpremu, nazivSektora, punoIme, rokZaduzenja, vidljiviZaposleni } from '../lib/izbor';
 import { danaDo, datum, datumVreme, sadrzi, useSada } from '../lib/format';
 import type { Karton, Zaposleni } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
@@ -21,7 +21,7 @@ import { PotpisPad } from '../components/Potpis';
  * pregledač pri štampi ponavlja na svakoj novoj strani.
  */
 export function Kartoni() {
-  const { baza, akcije, smem } = useStore();
+  const { baza, akcije, ja, smem } = useStore();
   const javi = useToast();
   const sada = useSada(1000);
   const [params, setParams] = useSearchParams();
@@ -29,16 +29,17 @@ export function Kartoni() {
   const [izmena, setIzmena] = useState<Zaposleni | null>(null);
   const [otvaranje, setOtvaranje] = useState<Zaposleni | null>(null);
 
+  // Kartoni se vide samo za zaposlene iz sektora u nadležnosti naloga.
   const lista = useMemo(
     () =>
-      baza.zaposleni.filter(
+      vidljiviZaposleni(baza, ja).filter(
         (z) =>
           !pretraga ||
           sadrzi(punoIme(z), pretraga) ||
           sadrzi(z.radnoMesto, pretraga) ||
-          sadrzi(z.organizacionaJedinica, pretraga),
+          sadrzi(nazivSektora(baza, z.sektorId), pretraga),
       ),
-    [baza.zaposleni, pretraga],
+    [baza, ja, pretraga],
   );
 
   const izabranId = params.get('z') ?? lista[0]?.id ?? '';
@@ -119,7 +120,7 @@ export function Kartoni() {
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{punoIme(z)}</span>
-                      <span className="block truncate text-micro text-ink-faint">{z.organizacionaJedinica}</span>
+                      <span className="block truncate text-micro text-ink-faint">{nazivSektora(baza, z.sektorId)}</span>
                     </span>
                     {imaKarton ? (
                       <span className="font-mono text-micro text-ink-faint tnum">{broj}</span>
@@ -289,7 +290,7 @@ function ZaglavljeKartona({ karton, zaposleni }: { karton: Karton; zaposleni: Za
       <dl className="grid gap-x-6 gap-y-1.5 border-b border-line py-2.5 sm:grid-cols-3">
         <Stavka label="Ime i prezime" vrednost={punoIme(zaposleni)} />
         <Stavka label="Radno mesto" vrednost={zaposleni.radnoMesto} />
-        <Stavka label="Organizaciona jedinica" vrednost={zaposleni.organizacionaJedinica} />
+        <Stavka label="Sektor" vrednost={nazivSektora(baza, zaposleni.sektorId)} />
         <Stavka label="Lokacija rada" vrednost={zaposleni.lokacija} />
         <Stavka label="U radnom odnosu od" vrednost={datum(zaposleni.datumZaposlenja)} mono />
         <Stavka label="Broj obuće / konfekcija" vrednost={`${zaposleni.brojCipela} / ${zaposleni.konfekcija}`} mono />
@@ -410,8 +411,12 @@ function OtvaranjeKartona({ zaposleni, onClose }: { zaposleni: Zaposleni | null;
           <Polje label="Radno mesto">
             <input className="input" value={v.radnoMesto} onChange={(e) => setPodaci({ ...podaci, radnoMesto: e.target.value })} />
           </Polje>
-          <Polje label="Organizaciona jedinica">
-            <input className="input" value={v.organizacionaJedinica} onChange={(e) => setPodaci({ ...podaci, organizacionaJedinica: e.target.value })} />
+          <Polje label="Sektor" hint="Određuje ko vidi i ko odobrava zaduženja ovog zaposlenog.">
+            <select className="input" value={v.sektorId} onChange={(e) => setPodaci({ ...podaci, sektorId: e.target.value })}>
+              {baza.sektori.map((s) => (
+                <option key={s.id} value={s.id}>{s.naziv}</option>
+              ))}
+            </select>
           </Polje>
           <Polje label="Lokacija rada">
             <input className="input" value={v.lokacija} onChange={(e) => setPodaci({ ...podaci, lokacija: e.target.value })} />
@@ -478,7 +483,7 @@ function OtvaranjeKartona({ zaposleni, onClose }: { zaposleni: Zaposleni | null;
 /* ------------------- Dopuna podataka na već otvorenom ------------------- */
 
 function DopunaKartona({ zaposleni, onClose }: { zaposleni: Zaposleni | null; onClose: () => void }) {
-  const { akcije } = useStore();
+  const { baza, akcije } = useStore();
   const javi = useToast();
   const [podaci, setPodaci] = useState<Partial<Zaposleni>>({});
 
@@ -516,8 +521,12 @@ function DopunaKartona({ zaposleni, onClose }: { zaposleni: Zaposleni | null; on
         <Polje label="Radno mesto">
           <input className="input" value={v.radnoMesto} onChange={(e) => setPodaci({ ...podaci, radnoMesto: e.target.value })} />
         </Polje>
-        <Polje label="Organizaciona jedinica">
-          <input className="input" value={v.organizacionaJedinica} onChange={(e) => setPodaci({ ...podaci, organizacionaJedinica: e.target.value })} />
+        <Polje label="Sektor" hint="Određuje ko vidi i ko odobrava zaduženja ovog zaposlenog.">
+          <select className="input" value={v.sektorId} onChange={(e) => setPodaci({ ...podaci, sektorId: e.target.value })}>
+            {baza.sektori.map((s) => (
+              <option key={s.id} value={s.id}>{s.naziv}</option>
+            ))}
+          </select>
         </Polje>
         <Polje label="Lokacija rada">
           <input className="input" value={v.lokacija} onChange={(e) => setPodaci({ ...podaci, lokacija: e.target.value })} />

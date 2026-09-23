@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Minus, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { kategorijaOpreme, punoIme, vaziRok } from '../lib/izbor';
+import { kategorijaOpreme, nazivSektora, punoIme, vaziRok, vidljiviZaposleni } from '../lib/izbor';
 import { danaRec, datum, sadrzi } from '../lib/format';
 import type { Oprema, StavkaZaduzenja, Zaduzenje } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
@@ -11,6 +11,7 @@ import { DijalogPotpisa } from '../components/Dijalozi';
 
 export function NovoZaduzenje() {
   const { baza, akcije, ja } = useStore();
+
   const javi = useToast();
   const idi = useNavigate();
 
@@ -25,17 +26,18 @@ export function NovoZaduzenje() {
 
   const zaposleni = baza.zaposleni.find((z) => z.id === zaposleniId);
 
+  // Oprema se izdaje samo zaposlenom iz sektora koji nalog pokriva.
   const listaZaposlenih = useMemo(
     () =>
-      baza.zaposleni.filter(
+      vidljiviZaposleni(baza, ja).filter(
         (z) =>
           z.aktivan &&
           (!pretragaZap ||
             sadrzi(punoIme(z), pretragaZap) ||
             sadrzi(z.radnoMesto, pretragaZap) ||
-            sadrzi(z.organizacionaJedinica, pretragaZap)),
+            sadrzi(nazivSektora(baza, z.sektorId), pretragaZap)),
       ),
-    [baza.zaposleni, pretragaZap],
+    [baza, ja, pretragaZap],
   );
 
   const dostupna = useMemo(
@@ -149,7 +151,7 @@ export function NovoZaduzenje() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{punoIme(z)}</span>
                         <span className="block truncate text-micro text-ink-muted">
-                          {z.radnoMesto} · {z.organizacionaJedinica} · obuća {z.brojCipela} · konf. {z.konfekcija}
+                          {z.radnoMesto} · {nazivSektora(baza, z.sektorId)} · obuća {z.brojCipela} · konf. {z.konfekcija}
                         </span>
                       </span>
                     </button>
@@ -253,7 +255,7 @@ export function NovoZaduzenje() {
           <Odeljak naslov="Rekapitulacija" nadnaslov="Zaduženje" ravno>
             <dl className="divide-y divide-line">
               <Stavka label="Zaposleni" vrednost={zaposleni ? punoIme(zaposleni) : 'nije izabran'} />
-              <Stavka label="Služba" vrednost={zaposleni?.organizacionaJedinica ?? '—'} />
+              <Stavka label="Sektor" vrednost={nazivSektora(baza, zaposleni?.sektorId)} />
               <Stavka label="Stavki" vrednost={String(stavke.length)} />
               <Stavka
                 label="Rok"

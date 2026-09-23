@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyRound, Plus, ShieldHalf, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { PRAVA, ULOGE, brojIzuzetaka, imaPravo } from '../lib/permissions';
+import { bezNadleznosti, nazivSektora } from '../lib/izbor';
 import { datumVreme, inicijali, relativno } from '../lib/format';
 import type { Nalog, Permission, Role } from '../lib/types';
 import { Zaglavlje } from '../components/Shell';
@@ -64,7 +65,8 @@ export function Nalozi() {
               <tr>
                 <th className="th">Korisnik</th>
                 <th className="th w-44">Uloga</th>
-                <th className="th w-36">Izuzeci</th>
+                <th className="th w-44">Nadležnost</th>
+                <th className="th w-28">Izuzeci</th>
                 <th className="th w-36">Poslednja prijava</th>
                 <th className="th w-32">Potpis</th>
                 <th className="th w-28">Status</th>
@@ -102,6 +104,21 @@ export function Nalozi() {
                         <option key={u} value={u}>{ULOGE[u].naziv}</option>
                       ))}
                     </select>
+                  </td>
+                  <td className="td">
+                    {n.sviSektori ? (
+                      <Oznaka ton="accent">svi sektori</Oznaka>
+                    ) : bezNadleznosti(n) ? (
+                      <Oznaka ton="danger">bez nadležnosti</Oznaka>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {n.sektori.map((sid) => (
+                          <span key={sid} className="chip bg-surface-deep text-ink-muted">
+                            {nazivSektora(baza, sid)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="td">
                     {brojIzuzetaka(n) === 0 ? (
@@ -178,6 +195,54 @@ export function Nalozi() {
               <Podatak label="Nalog kreiran" mono>{datumVreme(nalog.createdAt)}</Podatak>
               <Podatak label="Sertifikat" mono>{nalog.sertifikat ?? 'nije izdat'}</Podatak>
             </div>
+
+            <Odeljak naslov="Nadležnost po sektorima" nadnaslov="Koga vidi i kome odobrava" ravno>
+              <div className="border-b border-line px-4">
+                <Prekidac
+                  ukljucen={nalog.sviSektori}
+                  onChange={(t) => akcije.postaviNadleznost(nalog.id, nalog.sektori ?? [], t)}
+                  label="Svi sektori"
+                  opis="Nalog vidi celu firmu, bez sektorske podele."
+                />
+              </div>
+              {!nalog.sviSektori && (
+                <ul className="divide-y divide-line">
+                  {baza.sektori.map((s) => {
+                    const pokriva = (nalog.sektori ?? []).includes(s.id);
+                    return (
+                      <li key={s.id} className="flex items-center gap-3 px-4 py-2">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm">{s.naziv}</span>
+                          <span className="block truncate font-mono text-eyebrow text-ink-faint">
+                            {s.sifra} · {baza.zaposleni.filter((z) => z.sektorId === s.id).length} zaposlenih
+                          </span>
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-[#D2650B]"
+                          checked={pokriva}
+                          onChange={(e) =>
+                            akcije.postaviNadleznost(
+                              nalog.id,
+                              e.target.checked
+                                ? Array.from(new Set([...(nalog.sektori ?? []), s.id]))
+                                : (nalog.sektori ?? []).filter((x) => x !== s.id),
+                              nalog.sviSektori,
+                            )
+                          }
+                          aria-label={`Nadležnost za ${s.naziv}`}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {bezNadleznosti(nalog) && (
+                <p className="border-t border-line px-4 py-2.5 text-micro text-signal-danger">
+                  Nalog nema nijedan sektor — ne vidi nijednog zaposlenog ni zaduženje.
+                </p>
+              )}
+            </Odeljak>
 
             {PRAVA.map((g) => (
               <Odeljak key={g.grupa} naslov={g.grupa} nadnaslov="Grupa prava" ravno>

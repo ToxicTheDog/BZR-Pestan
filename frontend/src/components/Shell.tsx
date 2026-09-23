@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  Boxes, ClipboardList, ClipboardCheck, FileSignature, Gauge, LogOut, Mail, Menu,
+  Boxes, ClipboardList, ClipboardCheck, FileSignature, Gauge, LogOut, Mail, Menu, Network,
   ScrollText, Settings2, ShieldCheck, Stamp, UserCog, Users, X,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
@@ -22,7 +22,7 @@ type Stavka = {
 export function Shell({ children }: { children: ReactNode }) {
   const { baza, ja, odjava, smem } = useStore();
   const sada = useSada(1000);
-  const presek = napraviPresek(baza, sada);
+  const presek = napraviPresek(baza, sada, ja);
   const [meni, setMeni] = useState(false);
   const lokacija = useLocation();
 
@@ -58,6 +58,7 @@ export function Shell({ children }: { children: ReactNode }) {
     {
       naslov: 'Administracija',
       stavke: [
+        { to: '/sektori', label: 'Sektori', ikona: Network, pravo: 'sektori.upravljaj' },
         { to: '/nalozi', label: 'Nalozi i prava', ikona: UserCog, pravo: 'nalozi.upravljaj' },
         { to: '/podesavanja', label: 'Podešavanja', ikona: Settings2, pravo: 'podesavanja.upravljaj' },
         { to: '/logovi', label: 'Logovi', ikona: ScrollText, pravo: 'logovi.vidi' },

@@ -35,6 +35,8 @@ nalozi.post('/', async_((req, res) => {
     potpis: null,
     sertifikat: null,
     izuzeci: {},
+    sektori: [],
+    sviSektori: false,
     lozinkaHes: hesuj(lozinka),
   };
 
@@ -84,6 +86,28 @@ nalozi.delete('/:id', async_((req, res) => {
   sacuvaj();
   upisiLog(req.nalog, 'Obrisan nalog', `Nalog ${obrisan.username}`, 'Nalog uklonjen iz sistema.');
   res.json({ ok: true });
+}));
+
+/** Nadležnost naloga po sektorima — koga vidi i kome odobrava. */
+nalozi.put('/:id/nadleznost', async_((req, res) => {
+  const b = baza();
+  const nalog = b.nalozi.find((n) => n.id === req.params.id);
+  if (!nalog) throw nijeNadjeno('Nalog ne postoji.');
+
+  const svi = logicki(req.body, 'sviSektori') ?? false;
+  const trazeni = req.body?.sektori;
+  if (!Array.isArray(trazeni)) throw losZahtev('Pošaljite listu „sektori".');
+  const nepoznat = trazeni.find((x) => !b.sektori.some((s) => s.id === x));
+  if (nepoznat) throw losZahtev(`Sektor „${nepoznat}" ne postoji.`);
+
+  nalog.sektori = Array.from(new Set(trazeni));
+  nalog.sviSektori = svi;
+  sacuvaj();
+  upisiLog(
+    req.nalog, 'Izmenjena nadležnost', `Nalog ${nalog.username}`,
+    svi ? 'Nadležnost: svi sektori.' : `Nadležnost: ${nalog.sektori.length} sektora.`,
+  );
+  res.json({ nalog: javniNalog(nalog) });
 }));
 
 /** Izuzetak od prava uloge: `true` daje, `false` oduzima, `null` vraća na ulogu. */

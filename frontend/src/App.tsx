@@ -15,6 +15,7 @@ import { Kartoni } from './pages/Kartoni';
 import { Zaposleni } from './pages/Zaposleni';
 import { Posta } from './pages/Posta';
 import { Nalozi } from './pages/Nalozi';
+import { Sektori } from './pages/Sektori';
 import { Podesavanja } from './pages/Podesavanja';
 import { Logovi } from './pages/Logovi';
 import { MojNalog } from './pages/MojNalog';
@@ -45,6 +46,7 @@ function Rute() {
         <Route path="/kartoni" element={<Zasticena pravo="kartoni.vidi"><Kartoni /></Zasticena>} />
         <Route path="/zaposleni" element={<Zasticena pravo="zaposleni.vidi"><Zaposleni /></Zasticena>} />
         <Route path="/posta" element={<Zasticena pravo="mail.vidi"><Posta /></Zasticena>} />
+        <Route path="/sektori" element={<Zasticena pravo="sektori.upravljaj"><Sektori /></Zasticena>} />
         <Route path="/nalozi" element={<Zasticena pravo="nalozi.upravljaj"><Nalozi /></Zasticena>} />
         <Route path="/podesavanja" element={<Zasticena pravo="podesavanja.upravljaj"><Podesavanja /></Zasticena>} />
         <Route path="/logovi" element={<Zasticena pravo="logovi.vidi"><Logovi /></Zasticena>} />

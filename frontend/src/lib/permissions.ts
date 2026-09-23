@@ -70,6 +70,7 @@ export const PRAVA: { grupa: string; stavke: { id: Permission; naziv: string }[]
   {
     grupa: 'Administracija',
     stavke: [
+      { id: 'sektori.upravljaj', naziv: 'Upravljanje sektorima i nadležnošću' },
       { id: 'nalozi.upravljaj', naziv: 'Upravljanje nalozima i pravima' },
       { id: 'podesavanja.upravljaj', naziv: 'Konfiguracija sistema' },
       { id: 'logovi.vidi', naziv: 'Pregled logova' },

@@ -23,6 +23,12 @@ Namena: naći pravo mesto za izmenu bez čitanja celog repoa. Putanje su od kore
   `@media (pointer: coarse)`). Prelom `tablet:` (1120 px) drži dosije kolonu
   pored glavne na tabletu u pejzažu.
 - **Dnevnik aktivnosti** na pregledu vidi samo ko ima `logovi.vidi` (admin).
+- **Nadležnost ide preko sektora.** `Zaposleni.sektorId` je jedina podela;
+  `Nalog.sektori` + `Nalog.sviSektori` su jedini izvor istine o tome ko koga
+  vidi i kome odobrava. „Odobrioci sektora" i „uslužioci sektora" su **izvedeni**
+  (`odobriociSektora`, `usluziociSektora`) — nikad se ne upisuju zasebno.
+  `Zaduzenje.sektorId` je snimak u trenutku izdavanja, da istorija ostane tačna
+  kad zaposleni pređe u drugi sektor. Inventar i kontrole su van podele.
 
 ## Frontend — `frontend/src`
 
@@ -34,7 +40,7 @@ Namena: naći pravo mesto za izmenu bez čitanja celog repoa. Putanje su od kore
 | `lib/types.ts` | **ceo model podataka** | `Baza`, `Nalog`, `Zaposleni`, `Kategorija`, `Oprema`, `Zaduzenje`, `Razduzenje`, `Karton`, `Kontrola`, `Mail`, `Log`, `Podesavanja`, `Permission`, `Role` |
 | `lib/store.tsx` | **jedino mesto koje menja podatke** + sesija; `localStorage` ključ nosi verziju | `StoreProvider`, `useStore()` -> `{ baza, akcije, ja, prijava, odjava, smem }` |
 | `lib/permissions.ts` | katalog prava, fabrička prava uloge, računanje konačnog prava | `PRAVA`, `SVA_PRAVA`, `ULOGE`, `PODRAZUMEVANA_PRAVA`, `imaPravo` |
-| `lib/izbor.ts` | izvedeni podaci (selektori) nad `baza` | `napraviPresek`, `rokZaduzenja`, `vaziRok`, `punoIme`, `nadji*`, `OZNAKA_*` |
+| `lib/izbor.ts` | izvedeni podaci (selektori) nad `baza`, uključujući nadležnost | `nadleznost`, `uNadleznosti`, `vidljiviZaposleni`, `vidljivaZaduzenja`, `vidljivaRazduzenja`, `vidljiviKartoni`, `vidljivaPosta`, `odobriociSektora`, `usluziociSektora`, `napraviPresek`, `rokZaduzenja`, `vaziRok`, `punoIme`, `nadji*` |
 | `lib/format.ts` | datumi, pretraga bez kvačica, odbrojavanje, otisak | `datum`, `datumVreme`, `relativno`, `danaDo`, `sadrzi`, `procitajRok`, `useSada`, `otisak` |
 | `demo/seed.ts` | demo podaci; sve vreme je relativno na „sada" | `napraviBazu` |
 | `demo/potpis.ts` | generisani rukopisni potpis iz imena | `demoPotpis` |
@@ -76,6 +82,7 @@ Kolekcije za njih već postoje u bazi (prazne). Frontend do tada radi nad demo p
 | novo polje na entitetu | `lib/types.ts` -> `demo/seed.ts` -> `lib/store.tsx` (akcija) -> strana |
 | **nova kolekcija u bazi** | isto + **podići `KLJUC` verziju** u `lib/store.tsx`, inače stari `localStorage` puca |
 | novo pravo | `lib/permissions.ts` **i** `backend/src/prava.js` (isti spisak) |
+| nova strana koja prikazuje nešto vezano za zaposlenog | obavezno kroz `vidljivo*` selektor, nikad direktno `baza.zaduzenja` |
 | novo dugme/radnja | `smem('pravo')` oko njega + akcija u `store.tsx` |
 | izmena izgleda statusa | `components/Rok.tsx` ili `Oznaka` u `ui.tsx` — ne inline po stranama |
 | veličine za dodir / čitljivost | `index.css` (`html` koren + `@media (pointer: coarse)`) i `tailwind.config.js` (`ink.faint`, `micro`, `eyebrow`, `screens.tablet`) |
@@ -89,7 +96,10 @@ Kolekcije za njih već postoje u bazi (prazne). Frontend do tada radi nad demo p
 3. Svaka akcija piše u dnevnik (`saLogom` / `upisiLog`).
 4. `npm run build` u `frontend/` pre svakog push-a (uključuje `tsc --noEmit`).
 5. Kolona sa strane ne sme biti `sticky` — zamrzava sadržaj dok se ne skroluje do dna.
-6. **Ništa iznad strane ne sme van portala.** `Modal`, `Fioka` i toast idu kroz
+6. **Sve što se vezuje za zaposlenog filtrira se kroz `vidljivo*` selektore.**
+   Direktno čitanje `baza.zaduzenja` / `baza.zaposleni` po stranama probija
+   sektorsku podelu. Isto važi za `napraviPresek`, kome se prosleđuje nalog.
+7. **Ništa iznad strane ne sme van portala.** `Modal`, `Fioka` i toast idu kroz
    `Sloj` (portal na `<body>`) u `ui.tsx`. Predak sa `transform`/`filter`/`contain`
    postaje containing block za `position: fixed`, pa bi im `inset-0` značilo
    „ta kutija" umesto „ceo prozor" i isekao bi ih. Iz istog razloga omotač strane

@@ -1,5 +1,93 @@
-import type { Baza, Kontrola, Oprema, Zaduzenje, Zaposleni } from './types';
+import type { Baza, Kontrola, Nalog, Oprema, Sektor, Zaduzenje, Zaposleni } from './types';
 import { procitajRok, type Rok, danaDo } from './format';
+import { imaPravo } from './permissions';
+
+/* ------------------------- Nadležnost po sektorima -------------------------
+ *
+ * Nalog pokriva sektore iz `nalog.sektori`, a `sviSektori` ga oslobađa podele.
+ * Sve što je vezano za zaposlenog (zaduženja, razduženja, kartoni, pošta)
+ * filtrira se kroz ovu jednu funkciju — nema paralelnih pravila po stranama.
+ */
+
+export type Nadleznost = { svi: true } | { svi: false; sektori: Set<string> };
+
+export function nadleznost(nalog: Nalog | null): Nadleznost {
+  if (!nalog) return { svi: false, sektori: new Set() };
+  if (nalog.sviSektori) return { svi: true };
+  return { svi: false, sektori: new Set(nalog.sektori ?? []) };
+}
+
+export function uNadleznosti(n: Nadleznost, sektorId: string | undefined | null): boolean {
+  if (n.svi) return true;
+  return Boolean(sektorId) && n.sektori.has(sektorId as string);
+}
+
+/** Nalog bez ijednog sektora ne vidi nikoga — to se u administraciji ističe. */
+export function bezNadleznosti(nalog: Nalog): boolean {
+  return !nalog.sviSektori && (nalog.sektori ?? []).length === 0;
+}
+
+export function nadjiSektor(baza: Baza, id: string | undefined | null): Sektor | undefined {
+  return id ? baza.sektori.find((s) => s.id === id) : undefined;
+}
+
+export function nazivSektora(baza: Baza, id: string | undefined | null): string {
+  return nadjiSektor(baza, id)?.naziv ?? '—';
+}
+
+export function sektorZaposlenog(baza: Baza, zaposleniId: string): string | undefined {
+  return baza.zaposleni.find((z) => z.id === zaposleniId)?.sektorId;
+}
+
+/** Nalozi koji odobravaju zahteve za dati sektor — izvedeno, ne upisano. */
+export function odobriociSektora(baza: Baza, sektorId: string): Nalog[] {
+  return baza.nalozi.filter(
+    (n) =>
+      n.aktivan &&
+      imaPravo(n, 'odobrenja.odlucuj', baza.pravaUloga) &&
+      (n.sviSektori || (n.sektori ?? []).includes(sektorId)),
+  );
+}
+
+/** Nalozi koji izdaju opremu zaposlenima iz datog sektora. */
+export function usluziociSektora(baza: Baza, sektorId: string): Nalog[] {
+  return baza.nalozi.filter(
+    (n) =>
+      n.aktivan &&
+      imaPravo(n, 'zaduzenja.izdaj', baza.pravaUloga) &&
+      (n.sviSektori || (n.sektori ?? []).includes(sektorId)),
+  );
+}
+
+/* ------------------------- Filtrirani pogledi ------------------------- */
+
+export function vidljiviZaposleni(baza: Baza, nalog: Nalog | null): Zaposleni[] {
+  const n = nadleznost(nalog);
+  return baza.zaposleni.filter((z) => uNadleznosti(n, z.sektorId));
+}
+
+/** Za zaduženje se gleda snimljeni sektor, ne trenutni sektor zaposlenog. */
+export function vidljivaZaduzenja(baza: Baza, nalog: Nalog | null): Zaduzenje[] {
+  const n = nadleznost(nalog);
+  return baza.zaduzenja.filter((z) => uNadleznosti(n, z.sektorId ?? sektorZaposlenog(baza, z.zaposleniId)));
+}
+
+export function vidljivaRazduzenja(baza: Baza, nalog: Nalog | null) {
+  const dozvoljena = new Set(vidljivaZaduzenja(baza, nalog).map((z) => z.id));
+  return baza.razduzenja.filter((r) => dozvoljena.has(r.zaduzenjeId));
+}
+
+export function vidljiviKartoni(baza: Baza, nalog: Nalog | null) {
+  const n = nadleznost(nalog);
+  return baza.kartoni.filter((k) => uNadleznosti(n, sektorZaposlenog(baza, k.zaposleniId)));
+}
+
+export function vidljivaPosta(baza: Baza, nalog: Nalog | null) {
+  const n = nadleznost(nalog);
+  const adrese = new Set(vidljiviZaposleni(baza, nalog).map((z) => z.email));
+  // Poruke koje nisu vezane za zaposlenog (obaveštenja službi) vide svi.
+  return baza.mailovi.filter((m) => n.svi || adrese.has(m.za));
+}
 
 export function punoIme(z: Zaposleni | undefined | null): string {
   return z ? `${z.ime} ${z.prezime}` : '—';
@@ -64,9 +152,15 @@ export type Presek = {
   istekleObuke: Zaposleni[];
 };
 
-/** Jedan prolaz kroz bazu — dashboard, ticker i dosije čitaju isti presek. */
-export function napraviPresek(baza: Baza, sada: number): Presek {
-  const aktivna = baza.zaduzenja.filter((z) => z.status === 'aktivno');
+/**
+ * Jedan prolaz kroz bazu — dashboard i dosije čitaju isti presek.
+ * Računa se nad zaduženjima u nadležnosti naloga, da se brojači slažu
+ * sa onim što nalog zaista vidi u listama.
+ */
+export function napraviPresek(baza: Baza, sada: number, nalog: Nalog | null = null): Presek {
+  const zaduzenja = nalog ? vidljivaZaduzenja(baza, nalog) : baza.zaduzenja;
+  const zaposleni = nalog ? vidljiviZaposleni(baza, nalog) : baza.zaposleni;
+  const aktivna = zaduzenja.filter((z) => z.status === 'aktivno');
   const isteklo: Zaduzenje[] = [];
   const uskoro: Zaduzenje[] = [];
   const kriticno: Zaduzenje[] = [];
@@ -86,8 +180,8 @@ export function napraviPresek(baza: Baza, sada: number): Presek {
     isteklo: isteklo.sort(poRoku),
     uskoro: uskoro.sort(poRoku),
     kriticno: kriticno.sort(poRoku),
-    cekaOdobrenje: baza.zaduzenja.filter((z) => z.status === 'ceka_odobrenje'),
-    cekaPotpis: baza.zaduzenja.filter((z) => z.status === 'ceka_potpis'),
+    cekaOdobrenje: zaduzenja.filter((z) => z.status === 'ceka_odobrenje'),
+    cekaPotpis: zaduzenja.filter((z) => z.status === 'ceka_potpis'),
     slobodnoKomada: baza.oprema.filter((o) => o.stanje === 'slobodno').length,
     zaduzenoKomada: baza.oprema.filter((o) => o.stanje === 'zaduzeno').length,
     uServisu: baza.oprema.filter((o) => o.stanje === 'servis').length,
@@ -101,11 +195,11 @@ export function napraviPresek(baza: Baza, sada: number): Presek {
       .sort((a, b) => new Date(a.planiranoZa).getTime() - new Date(b.planiranoZa).getTime()),
     kontroleKasne: baza.kontrole.filter((k) => !k.izvrsenoAt && new Date(k.planiranoZa).getTime() < sada),
     nalaziSaPrimedbama: baza.kontrole.filter((k) => k.nalaz === 'primedbe' || k.nalaz === 'neispravno'),
-    istekliLekarski: baza.zaposleni.filter((z) => {
+    istekliLekarski: zaposleni.filter((z) => {
       const d = danaDo(z.lekarskiVazi);
       return d !== null && d <= 30;
     }),
-    istekleObuke: baza.zaposleni.filter((z) => {
+    istekleObuke: zaposleni.filter((z) => {
       const d = danaDo(z.obukaBzrVazi);
       return d !== null && d <= 30;
     }),

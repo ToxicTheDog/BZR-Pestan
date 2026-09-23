@@ -2,20 +2,96 @@
 import { Router } from 'express';
 import { baza, sacuvaj, id } from '../baza.js';
 import { trazenaPrijava, trazenoPravo } from '../auth.js';
-import { async_, losZahtev, nijeNadjeno, sukob } from '../greske.js';
+import { uNadleznosti } from '../prava.js';
+import { async_, losZahtev, nijeNadjeno, sukob, zabranjeno } from '../greske.js';
+import { imaPravo } from '../prava.js';
 import { broj, izbor, logicki, spoji, tekst } from '../provera.js';
 import { upisiLog } from '../dnevnik.js';
 
 const STANJA = ['slobodno', 'zaduzeno', 'servis', 'rezervisano', 'otpisano'];
 const TIPOVI = ['LZO', 'ALAT', 'POTROSNO'];
 
+/* ----------------------------- Sektori ----------------------------- */
+
+export const sektori = Router();
+sektori.use(trazenaPrijava);
+
+sektori.get('/', async_((req, res) => {
+  const b = baza();
+  res.json({
+    stavke: b.sektori.map((s) => ({
+      ...s,
+      brojZaposlenih: b.zaposleni.filter((z) => z.sektorId === s.id).length,
+      // Ko odobrava, odnosno izdaje za ovaj sektor — izvedeno iz naloga.
+      odobrioci: b.nalozi
+        .filter((n) => n.aktivan && imaPravo(n, 'odobrenja.odlucuj', b.pravaUloga) && uNadleznosti(n, s.id))
+        .map((n) => ({ id: n.id, fullName: n.fullName })),
+      usluzioci: b.nalozi
+        .filter((n) => n.aktivan && imaPravo(n, 'zaduzenja.izdaj', b.pravaUloga) && uNadleznosti(n, s.id))
+        .map((n) => ({ id: n.id, fullName: n.fullName })),
+      uNadleznosti: uNadleznosti(req.nalog, s.id),
+    })),
+  });
+}));
+
+function poljaSektora(telo, obavezno) {
+  return spoji({
+    naziv: tekst(telo, 'naziv', { obavezno, min: 2, max: 80 }),
+    sifra: tekst(telo, 'sifra', { obavezno, min: 2, max: 16 })?.toUpperCase(),
+    opis: tekst(telo, 'opis', { max: 300 }),
+    aktivan: logicki(telo, 'aktivan'),
+  });
+}
+
+sektori.post('/', trazenoPravo('sektori.upravljaj'), async_((req, res) => {
+  const b = baza();
+  const polja = poljaSektora(req.body, true);
+  if (b.sektori.some((s) => s.sifra === polja.sifra)) throw sukob('Šifra sektora je zauzeta.');
+
+  const nov = { id: id('s'), opis: '', aktivan: true, ...polja };
+  b.sektori.push(nov);
+  sacuvaj();
+  upisiLog(req.nalog, 'Dodat sektor', nov.naziv, nov.opis);
+  res.status(201).json({ sektor: nov });
+}));
+
+sektori.patch('/:id', trazenoPravo('sektori.upravljaj'), async_((req, res) => {
+  const b = baza();
+  const s = b.sektori.find((x) => x.id === req.params.id);
+  if (!s) throw nijeNadjeno('Sektor ne postoji.');
+  const izmene = poljaSektora(req.body, false);
+  if (izmene.sifra && b.sektori.some((x) => x.sifra === izmene.sifra && x.id !== s.id)) {
+    throw sukob('Šifra sektora je zauzeta.');
+  }
+  Object.assign(s, izmene);
+  sacuvaj();
+  upisiLog(req.nalog, 'Izmenjen sektor', s.naziv, Object.keys(izmene).join(', '));
+  res.json({ sektor: s });
+}));
+
+sektori.delete('/:id', trazenoPravo('sektori.upravljaj'), async_((req, res) => {
+  const b = baza();
+  const i = b.sektori.findIndex((x) => x.id === req.params.id);
+  if (i === -1) throw nijeNadjeno('Sektor ne postoji.');
+  const zauzeto = b.zaposleni.filter((z) => z.sektorId === req.params.id).length;
+  if (zauzeto > 0) throw sukob(`Sektor nije prazan — ${zauzeto} zaposlenih treba prvo premestiti.`);
+
+  const [obrisan] = b.sektori.splice(i, 1);
+  // Nadležnost naloga ne sme da pokazuje na sektor koji više ne postoji.
+  for (const n of b.nalozi) n.sektori = (n.sektori ?? []).filter((x) => x !== obrisan.id);
+  sacuvaj();
+  upisiLog(req.nalog, 'Obrisan sektor', obrisan.naziv, 'Sektor uklonjen iz organizacione šeme.');
+  res.json({ ok: true });
+}));
+
 /* ---------------------------- Zaposleni ---------------------------- */
 
 export const zaposleni = Router();
 zaposleni.use(trazenaPrijava);
 
-zaposleni.get('/', trazenoPravo('zaposleni.vidi'), async_((_req, res) => {
-  res.json({ stavke: baza().zaposleni });
+// Vide se samo zaposleni iz sektora u nadležnosti naloga.
+zaposleni.get('/', trazenoPravo('zaposleni.vidi'), async_((req, res) => {
+  res.json({ stavke: baza().zaposleni.filter((z) => uNadleznosti(req.nalog, z.sektorId)) });
 }));
 
 function poljaZaposlenog(telo, obavezno) {
@@ -23,7 +99,7 @@ function poljaZaposlenog(telo, obavezno) {
     ime: tekst(telo, 'ime', { obavezno, min: 2, max: 60 }),
     prezime: tekst(telo, 'prezime', { obavezno, min: 2, max: 60 }),
     radnoMesto: tekst(telo, 'radnoMesto', { max: 120 }),
-    organizacionaJedinica: tekst(telo, 'organizacionaJedinica', { max: 120 }),
+    sektorId: tekst(telo, 'sektorId', { obavezno }),
     lokacija: tekst(telo, 'lokacija', { max: 120 }),
     email: tekst(telo, 'email', { max: 160 }),
     telefon: tekst(telo, 'telefon', { max: 40 }),
@@ -37,12 +113,16 @@ function poljaZaposlenog(telo, obavezno) {
 }
 
 zaposleni.post('/', trazenoPravo('zaposleni.upis'), async_((req, res) => {
+  const polja = poljaZaposlenog(req.body, true);
+  if (!baza().sektori.some((s) => s.id === polja.sektorId)) throw losZahtev('Sektor ne postoji.');
+  if (!uNadleznosti(req.nalog, polja.sektorId)) throw zabranjeno('Nemate nadležnost nad tim sektorom.');
+
   const nov = {
     id: id('z'),
-    ime: '', prezime: '', radnoMesto: '', organizacionaJedinica: '', lokacija: '',
+    ime: '', prezime: '', radnoMesto: '', sektorId: '', lokacija: '',
     email: '', telefon: '', datumZaposlenja: new Date().toISOString(),
     brojCipela: '', konfekcija: '', aktivan: true, lekarskiVazi: null, obukaBzrVazi: null,
-    ...poljaZaposlenog(req.body, true),
+    ...polja,
   };
   baza().zaposleni.unshift(nov);
   sacuvaj();
@@ -53,7 +133,11 @@ zaposleni.post('/', trazenoPravo('zaposleni.upis'), async_((req, res) => {
 zaposleni.patch('/:id', trazenoPravo('zaposleni.upis'), async_((req, res) => {
   const z = baza().zaposleni.find((x) => x.id === req.params.id);
   if (!z) throw nijeNadjeno('Zaposleni ne postoji.');
+  if (!uNadleznosti(req.nalog, z.sektorId)) throw zabranjeno('Nemate nadležnost nad tim sektorom.');
   const izmene = poljaZaposlenog(req.body, false);
+  if (izmene.sektorId && !uNadleznosti(req.nalog, izmene.sektorId)) {
+    throw zabranjeno('Ne možete premestiti zaposlenog u sektor van svoje nadležnosti.');
+  }
   Object.assign(z, izmene);
   sacuvaj();
   upisiLog(req.nalog, 'Izmenjen zaposleni', `${z.ime} ${z.prezime}`, Object.keys(izmene).join(', '));
